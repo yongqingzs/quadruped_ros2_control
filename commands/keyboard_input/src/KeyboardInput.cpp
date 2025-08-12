@@ -22,6 +22,7 @@ KeyboardInput::KeyboardInput() : Node("keyboard_input_node") {
 void KeyboardInput::timer_callback() {
     if (kbhit()) {
         char key = getchar();
+        RCLCPP_INFO(this->get_logger(), "按下的键为: %c", key);
         check_command(key);
         if (inputs_.command == 0) check_value(key);
         else {
@@ -31,6 +32,9 @@ void KeyboardInput::timer_callback() {
             inputs_.ry = 0;
             reset_count_ = 100;
         }
+        RCLCPP_INFO(this->get_logger(),
+            "inputs_: command=%d, lx=%.2f, ly=%.2f, rx=%.2f, ry=%.2f",
+            inputs_.command, inputs_.lx, inputs_.ly, inputs_.rx, inputs_.ry);
         publisher_->publish(inputs_);
         just_published_ = true;
     } else {
