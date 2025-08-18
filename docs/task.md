@@ -1,3 +1,8 @@
+## tips
+1. 使用中文完成文档。
+2. 使用中文和我对话。
+3. 不要进行编译(colcon build)。
+
 ## task1
 详细阅读 quadruped_ros2_control 项目并进行分析，完成一个总体的分析文档，包含以下内容:
 1. gazebo 模拟下数据如何在各个节点(需指出接口)传递。
@@ -18,3 +23,8 @@
 2. 说明各个节点中各个方法的功能。
 3. 说明你觉得应当说明的内容。
 4. 将整理好的内容输出到 docs 下的 rl_quadruped_controller.md 中。
+
+## task4
+分析并梳理 ocs2_quadruped_controller 包中的代码，完成以下任务:
+1. 说明"步态(gait)"是如何在代码里体现，gait 切换又会如何体现。
+2. 将整理好的内容输出到 docs 下的 ocs2_quadruped_controller.md 中（新增相关内容即可）。

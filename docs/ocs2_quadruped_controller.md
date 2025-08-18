@@ -74,7 +74,7 @@ graph TD
 *   `init()`: 在控制器首次进入OCS2控制状态时被调用，用于初始化MPC并等待第一个策略的生成。
 *   `setupLeggedInterface()`: 设置 `LeggedInterface`，这是OCS2与机器人模型之间的桥梁，定义了动力学、约束和代价函数。
 *   `setupMpc()`: 设置MPC求解器 (`SqpMpc`)、步态管理器 (`GaitManager`) 和目标管理器 (`TargetManager`)。
-*   `setupMrt()`: 设置MPC-MRT（Model Predictive Control - Multi-threading Real-time）接口，并启动一个独立的线程来异步运行MPC优化。
+*   `setupMrt()`: 设置MPC-MRT（Model Predictive Control-Model Reference Tracking）接口，并启动一个独立的线程来异步运行MPC优化。
 
 ### `StateOCS2` (OCS2控制状态)
 
@@ -113,7 +113,117 @@ graph TD
 *   `WeightedWbc`: 一种WBC实现，它将不同的任务加权后组合成一个二次规划（QP）问题来求解。
 *   `HierarchicalWbc`: 另一种WBC实现，它将任务按优先级分层，构成一个分层的QP问题来求解。
 
-## 3. 值得说明的内容
+## 3. 步态 (Gait) 的实现与切换
+
+步态是四足机器人运动的核心概念，它定义了在运动过程中足端的接触模式和时序。在 `ocs2_quadruped_controller` 中，步态的管理和切换是一个动态且与MPC紧密结合的过程。
+
+### 步态的定义与表示
+
+1.  **定义**: 一个步态在代码中被定义为一个 `ModeSequenceTemplate`。这个结构体包含两个关键部分：
+    *   `switchingTimes`: 一个时间点序列，定义了每个运动阶段（Phase）的持续时间。
+    *   `modeSequence`: 一个模式ID序列，每个ID对应 `switchingTimes` 的一个阶段，定义了在该阶段哪些足是处于支撑相（Stance）还是摆动相（Swing）。模式ID是一个整数，通过 `modeNumber2StanceLeg` 函数可以解码为每个腿的布尔接触标志。
+
+2.  **配置文件**: 具体的步态参数（如trot, pace, standing_trot等）并不是硬编码在代码中的，而是在机器人描述包（例如 `go2_description`）的 `config/ocs2/gait.info` 文件中定义的。控制器在初始化时会从这个文件加载所有可用的步态模板。
+
+### 步态的切换流程
+
+步态的切换是由外部指令触发，并在MPC的规划周期中动态完成的，具体流程如下：
+
+1.  **外部指令输入**: 用户通过键盘、手柄或其他节点发布一个 `control_input_msgs::msg::Inputs` 类型的消息到 `/control_input` 话题。消息中的 `command` 字段用于指定期望的步态（例如，3代表trot，4代表standing_trot）。
+
+2.  **指令接收**: `Ocs2QuadrupedController` 类订阅了 `/control_input` 话题。当接收到新消息时，它会更新内部共享数据结构 `ctrl_interfaces_.control_inputs_` 中的 `command` 值。
+
+3.  **GaitManager 的角色**: `GaitManager` 类是步态管理的核心。
+    *   在初始化时 (`GaitManager::init`)，它会加载 `gait.info` 文件中定义的所有步态模板，并存储在一个列表 `gait_list_` 中。
+    *   `GaitManager` 被注册为MPC求解器的一个 **同步模块 (Synchronized Module)**。这意味着它的 `preSolverRun` 方法会在 **每次MPC求解之前** 被自动调用。
+
+4.  **检测与更新**:
+    *   在 `preSolverRun` 方法中，会调用 `getTargetGait`。
+    *   `getTargetGait` 方法会检查 `ctrl_interfaces_.control_inputs_.command` 的值是否与上一次记录的 `last_command_` 不同。
+    *   如果指令发生了变化，它会根据新的 `command` 值从 `gait_list_` 中选择一个新的步态模板 (`target_gait_`)，并设置一个标志位 `gait_updated_ = true`。
+
+5.  **注入新步态**:
+    *   回到 `preSolverRun` 方法，如果 `gait_updated_` 标志位为 `true`，控制器会调用 `gait_schedule_ptr_->insertModeSequenceTemplate()`。
+    *   这个函数的作用是将新的步态模板 (`target_gait_`) 插入到MPC的 `GaitSchedule` (步态时间表) 中。`GaitSchedule` 负责维护未来一段时间内的模式序列。这个插入操作是平滑的，它会规划从当前步态到新步态的过渡。
+
+6.  **MPC重新规划**: 当MPC求解器开始本次迭代时，它会使用更新后的 `GaitSchedule` 来进行运动规划。因此，新生成的优化轨迹将自然地体现出新步态的接触模式和时序。
+
+通过这种方式，步态的切换不是一个瞬时的、硬性的改变，而是被无缝地集成到了MPC的优化框架中，使得机器人能够平滑、动态地在不同步态之间进行过渡。
+
+## 步态对MPC的影响
+
+为了具象化说明，我们首先要理解MPC的目标是求解一个在未来一段时间内的最优控制问题（Optimal Control Problem, OCP），这个问题的通用形式可以写成：
+
+### 最优控制问题的形式
+
+- **最小化**: J(x, u) (一个代价函数，比如跟踪误差、能量消耗等)
+- **受限于** (subject to):
+  1. x_dot = f(x, u) (系统动力学)
+  2. g(x, u) <= 0 (不等式约束)
+  3. h(x, u) = 0 (等式约束)
+
+### 步态 (Gait) 的作用
+
+步态在这个框架中，扮演了“模式调度器 (Mode Scheduler)”的角色。它提供了一个随时间变化的模式 m(t)。这个模式 m(t) 是一个离散的变量（比如一个整数），它唯一地定义了当前的接触状态。
+
+例如：
+- m(t) = 0 可能代表所有腿都处于摆动相（飞行）。
+- m(t) = 5 可能代表左前（LF）和右后（RH）腿处于支撑相，而另外两条腿处于摆动相（典型的Trot步态）。
+
+这个模式 m(t) 不会改变动力学方程 f(x, u) 的形式，但它会动态地改变约束 g(x, u) 和 h(x, u) 的集合。我们可以把约束看作是模式的函数，即 g_m(x, u) 和 h_m(x, u)。
+
+### 具体约束示例
+
+#### 1. 零速约束 (Zero Velocity Constraint) - 用于支撑腿
+
+- **目的**: 保证与地面接触的足端速度为零，防止打滑。
+- **公式 (概念性)**: v_foot_i(x) = 0，其中 v_foot_i 是第 i 个足端的速度，它是机器人状态 x (包含关节角度和速度) 的函数。
+- **步态如何影响**: 这个约束仅在第 i 条腿处于支撑相 (Stance Phase) 时才被激活。
+  - **具体体现**: 在代码中，`ZeroVelocityConstraintCppAd::isActive(time)` 方法会查询 ReferenceManager 当前时间 time 的接触标志 `contact_flag_i(m(t))`。
+    - IF `contact_flag_i(m(t)) == true` THEN MPC求解器必须满足 `v_foot_i(x) = 0` 这个等式约束。
+    - ELSE (腿在摆动相), 这个约束被忽略。
+
+#### 2. 零力约束 (Zero Force Constraint) - 用于摆动腿
+
+- **目的**: 保证在空中摆动的腿与地面之间没有接触力。
+- **公式 (概念性)**: F_foot_i(u) = 0，其中 F_foot_i 是施加在第 i 个足端的地面反作用力，它是控制输入 u 的一部分。
+- **步态如何影响**: 这个约束与零速约束正好相反，它仅在第 i 条腿处于摆动相 (Swing Phase) 时才被激活。
+  - **具体体现**: `ZeroForceConstraint::isActive(time)` 方法会进行查询。
+    - IF `contact_flag_i(m(t)) == false` THEN MPC求解器必须满足 `F_foot_i(u) = 0` 这个等式约束。
+    - ELSE (腿在支撑相), 这个约束被忽略，允许足端产生力。
+
+#### 3. 摩擦锥约束 (Friction Cone Constraint) - 用于支撑腿
+
+- **目的**: 保证地面反作用力在摩擦锥内，以防止足端打滑。
+- **公式 (概念性)**: sqrt(F_x^2 + F_y^2) <= mu * F_z，其中 F_x, F_y 是水平切向力，F_z 是法向力，mu 是摩擦系数。
+- **步态如何影响**: 这个约束同样仅在腿处于支撑相时才有意义。
+  - **具体体现**: `FrictionConeConstraint::isActive(time)` 方法进行查询。
+    - IF `contact_flag_i(m(t)) == true` THEN MPC求解器必须满足 `sqrt(F_x^2 + F_y^2) - mu * F_z <= 0` 这个不等式约束。
+    - ELSE (腿在摆动相), 这个约束被忽略。
+
+#### 4. 摆动腿轨迹约束 (Swing Trajectory Constraint)
+
+- **目的**: 引导摆动腿按照预定的轨迹（例如，一个半椭圆或三次样条曲线）运动，以越过障碍并到达下一个落足点。
+- **公式 (概念性)**: z_foot_i(x) >= z_swing_desired(t)，其中 z_foot_i 是足端的实际高度，z_swing_desired(t) 是由 SwingTrajectoryPlanner 生成的期望最低高度。
+- **步态如何影响**: 这个约束仅在腿处于摆动相时才被激活。
+  - **具体体现**: `NormalVelocityConstraintCppAd::isActive(time)` (以及其他相关约束) 会进行查询。
+    - IF `contact_flag_i(m(t)) == false` THEN MPC求解器会激活一系列与摆动腿轨迹相关的约束，确保脚能抬起并向前摆动。
+    - ELSE (腿在支撑相), 这些约束被忽略。
+
+### 总结流程
+
+所以，当用户切换步态时：
+
+1. **GaitManager** 将新的步态模板（包含新的模式序列 `modeSequence` 和切换时间 `switchingTimes`）插入到MPC的 `GaitSchedule` 中。
+2. **MPC求解器** 在进行优化时，对于其规划时域中的每一个时间点 t：
+   - 它会从 `GaitSchedule` 中查询该时间点的模式 m(t)。
+   - 根据 m(t) 解码出每条腿的接触状态 `contact_flag(m(t))`。
+   - 动态地构建该时间点的约束集：为支撑腿激活零速和摩擦锥约束，为摆动腿激活零力和摆动轨迹约束。
+3. **求解器** 在这个动态变化的约束集下，找到最优的状态和控制序列。
+
+最终，机器人的运动就自然地体现出了新步态的特征。
+
+## 4. 值得说明的内容
 
 *   **MPC与WBC的解耦**: 该控制器采用了MPC+WBC的经典分层控制思想。MPC在高层负责在较长的时间尺度上进行优化，生成一个动态可行的全身运动轨迹（以中心化模型表示）。WBC在底层负责在每个控制瞬间，将MPC生成的期望运动转换为具体的关节力矩，同时处理如摩擦锥、关节限制等更具体的约束。这种分层结构使得问题更易于求解，并能实时运行。
 *   **实时多线程 (MRT)**: MPC的计算量通常很大，难以在每个控制周期内完成。该控制器通过 `MPC_MRT_Interface` 将MPC的优化过程放在一个独立的、较低优先级的线程中运行。主控制线程（高优先级）则在每个周期从MRT接口获取最新计算出的最优策略，并用它来计算控制指令。这保证了控制回路的实时性。
