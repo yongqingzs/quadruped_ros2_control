@@ -82,7 +82,7 @@ void KeyboardInput::check_command(const char key) {
             break;
         case '0':
             inputs_.command = 10;
-        break;
+            break;
         case ' ':
             inputs_.lx = 0;
             inputs_.ly = 0;
