@@ -67,3 +67,10 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 3. 需要分析"传感器->mpc->wbc->机器狗"每一次数据传输、处理过程中的输入输出具体是哪些。
 4. 说明你觉得应当说明的内容。
 5. 将整理好的内容输出到 docs 下的 StateOCS2.md 中。
+
+## task9
+分析并梳理 CtrlComponent 类中的代码(会涉及其他类)，完成以下任务:
+1. 说明该类各个方法的功能(尤其是 updateState 方法)。
+2. 需要分析 updateState 过程中发生的数据转换，如: measured_rbd_state_ 如何转换为 observation_.state ， observation_.state 具体包括哪些量（物理意义以及所在数组位数）。
+3. 说明你觉得应当说明的内容。
+4. 将整理好的内容输出到 docs 下的 CtrlComponent.md 中。
