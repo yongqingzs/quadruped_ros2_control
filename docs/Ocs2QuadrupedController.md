@@ -71,6 +71,17 @@ sequenceDiagram
     -   **调用时机**: 控制器处于 `active` 状态时，由 `Controller Manager` 以 `update_rate` 参数指定的频率周期性调用。这是**实时控制循环**的核心。
     -   **功能**:
         1.  **更新状态**: 调用 `ctrl_comp_->updateState()`，此方法会从 `state_interfaces_` 读取最新的机器人状态（关节位置/速度、IMU 数据等），并更新状态估计器。
+        ```txt
+        in ctrl_comp_->updateState:
+
+        measured_rbd_state_ = estimator_->update(time, period);
+        size: 36
+        详情见 estimator.md
+
+        observation_.state = rbd_conversions_->computeCentroidalStateFromRbdModel(measured_rbd_state_);
+        size: 24
+
+        ```
         2.  **执行 FSM**: 运行当前状态的 `run()` 方法 (`current_state_->run()`)。例如，在 `StateOCS2` 状态下，这会触发 MPC 的计算和 WBC (全身控制器) 的求解，最终计算出关节指令。
         3.  **状态切换**: 检查当前状态是否需要切换到下一个状态 (`current_state_->checkChange()`)。如果需要，则执行状态的退出 (`exit()`) 和新状态的进入 (`enter()`) 逻辑。
 

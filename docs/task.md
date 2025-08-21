@@ -59,3 +59,11 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 3. mujoco.launch.py 是否可用于真实的硬件，用于真实的硬件需要注意什么。
 4. 说明你觉得应当说明的内容。
 5. 将整理好的内容输出到 docs 下的 launch_py.md 中。
+
+## task8
+分析并梳理 StateOCS2 类中的代码(会涉及其他类)，完成以下任务:
+1. 说明该类各个方法的功能(尤其是 run 方法)。
+2. 需要分析 evaluatePolicy、 updatePolicy 中 Policy 具体是什么(一个函数、一个变量还是类似神经网络，其接收什么输入，输出什么)。
+3. 需要分析"传感器->mpc->wbc->机器狗"每一次数据传输、处理过程中的输入输出具体是哪些。
+4. 说明你觉得应当说明的内容。
+5. 将整理好的内容输出到 docs 下的 StateOCS2.md 中。

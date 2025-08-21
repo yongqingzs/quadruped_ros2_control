@@ -125,12 +125,24 @@ classDiagram
 1.  **状态向量 `rbd_state_`**:
     -   **去向**: 返回给 `Ocs2QuadrupedController`，作为 MPC 和 WBC 控制算法的当前状态输入。
     -   **内容**: 一个包含了机器人所有状态的向量，主要包括：
-        -   估计的 base 姿态（欧拉角）
-        -   估计的 base 位置
-        -   关节角度
-        -   估计的 base 全局角速度
-        -   估计的 base 线速度
-        -   关节角速度
+        -   估计的 base 姿态(欧拉角): 3  转换测量值zyx
+        -   估计的 base 位置:  3  xHat_
+        -   关节角度:  12  测量值joint_pos
+        -   估计的 base 全局角速度:  3  转换测量值angularVel
+        -   估计的 base 线速度:  3  xHat_
+        -   关节角速度:  12  测量值joint_vel
+    ```txt
+    info_.actuatedDofNum size: 12
+    info_.generalizedCoordinatesNum size: 18
+    
+    xHat_包括: 
+        base 位置: 3
+        base 速度: 3
+        足端位置: 3*4=12
+    rbd_state_ 使用 xHat_:
+        base 位置: 3
+        base 速度: 3
+    ```
 
 2.  **ROS 2 话题**:
     -   **去向**: 发布到 ROS 2 网络，供其他节点（如 Rviz 可视化、导航模块）使用。
