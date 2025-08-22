@@ -88,3 +88,10 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 2. 需要分析 "涉及接受外部数据和更新对外数据" 方法执行过程中发生的数据转换（物理意义以及所在数组位数）。
 3. 说明你觉得应当说明的内容。
 4. 将整理好的内容输出到 docs/class 下的 SwitchedModelReferenceManager.md 中。
+
+## task12
+分析并梳理 LeggedInterface 类中的代码，完成以下任务：
+1. 说明类的各个方法的功能(重点关注其数据处理和更新的流程)。
+2. 需要总结 LeggedInterface 控制的组件名单。
+3. 说明你觉得应当说明的内容。
+4. 将整理好的内容输出到 docs/class 下的 LeggedInterface.md 中。
