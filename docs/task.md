@@ -95,3 +95,9 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 2. 需要总结 LeggedInterface 控制的组件名单。
 3. 说明你觉得应当说明的内容。
 4. 将整理好的内容输出到 docs/class 下的 LeggedInterface.md 中。
+
+## task13
+分析并梳理 GaitManager 类中的代码，完成以下任务：
+1. 说明类的各个方法的功能(重点关注"涉及接受外部数据和更新对外数据"的流程)。
+2. 说明你觉得应当说明的内容。
+3. 将整理好的内容输出到 docs/class 下的 GaitManager.md 中。
