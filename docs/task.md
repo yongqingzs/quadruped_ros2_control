@@ -125,3 +125,9 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 2. 着重并详细说明该包如何与 ros2_control、unitree_sdk2 、unitree_mujoco 进行数据交互(需要说明数据的具体类型，数组位数含义)。它们是什么关系(关系可以用 Mermaid 表示，但也需用文字表述节点的关系)。
 3. 说明你觉得应当说明的内容。
 4. 将整理好的内容输出到 docs 下的 hardware_unitree_sdk2.md 中。
+
+## task17
+对比 hardware_unitree_sdk2 包和 unitree_ros2 包。不要摘录过多源码，使用叙述性文字和 Mermaid 图。完成以下任务：
+1. 说明这两个包之间的关系。hardware_unitree_sdk2 是基于 unitree_ros2 完成的吗？如果是的话，它添加了什么工作？
+2. 说明你觉得应当说明的内容。
+3. 将整理好的内容添加到 hardware_unitree_sdk2.md 中（不要修改现有 md 内容，只需要新增）。
