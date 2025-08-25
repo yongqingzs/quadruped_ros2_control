@@ -42,6 +42,53 @@ cd ~/ros2_ws
 MAKEFLAGS="-j4" colcon build --packages-up-to rl_quadruped_controller --symlink-install
 ```
 
+## build mujoco
+mujoco
+```bash
+sudo apt install libglfw3-dev libxinerama-dev libxcursor-dev libxi-dev libyaml-cpp-dev
+
+# mujoco
+cd ~/jazzy_ws/src
+git clone https://github.com/google-deepmind/mujoco.git
+cd mujoco
+mkdir build && cd build
+cmake ..
+make -j4
+sudo make install
+simulate # mujoco test
+```
+
+unitree mujoco
+```bash
+# unitree_sdk2
+git clone https://github.com/unitreerobotics/unitree_sdk2.git
+cd unitree_sdk2/
+mkdir build
+cd build
+cmake ..
+make -j4
+sudo make install
+
+# unitree_mujoco*
+sudo apt update
+sudo apt install libglfw3 libglfw3-dev
+
+git clone https://github.com/legubiao/unitree_mujoco
+cd unitree_mujoco/simulate
+mkdir build && cd build
+cmake ..
+make -j4
+
+# hardware_unitree_sdk2
+MAKEFLAGS="-j4" colcon build --packages-up-to hardware_unitree_sdk2
+```
+
+for quick
+```bash
+# 需要将配置文件修改成绝对路径
+echo "alias unitree_mujoco="~/jazzy_ws/src/unitree_mujoco/simulate/build/unitree_mujoco"" >> ~/.bashrc
+```
+
 ## start
 ```bash
 # 终端1
@@ -53,6 +100,18 @@ ros2 launch ocs2_quadruped_controller gazebo.launch.py pkg_description:=go2_desc
 ros2 launch rl_quadruped_controller gazebo.launch.py pkg_description:=go2_description
 
 # 终端2
+ros2 run keyboard_input keyboard_input
+```
+
+## start mujoco
+```bash
+# 终端1 mujoco
+unitree_mujoco
+
+# 终端2 mpc
+ros2 launch ocs2_quadruped_controller mujoco.launch.py
+
+# 终端3
 ros2 run keyboard_input keyboard_input
 ```
 

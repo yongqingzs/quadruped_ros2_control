@@ -101,3 +101,12 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 1. 说明类的各个方法的功能(重点关注"涉及接受外部数据和更新对外数据"的流程)。
 2. 说明你觉得应当说明的内容。
 3. 将整理好的内容输出到 docs/class 下的 GaitManager.md 中。
+
+## task14
+分析并梳理 unitree_sdk2 包中的代码，完成以下任务：
+1. 可以基于 go2 分析以下内容。
+2. 说明该包实现的功能，其数据处理和更新的流程。
+3. 说明该包如何与 硬件/mujoco 交互，如何调用该包获取数据。
+4. 说明该包是否进行了代码封装(即隐藏具体实现)。如果有的话，如何进行替代。
+5. 说明你觉得应当说明的内容。
+6. 将整理好的内容输出到 docs/external 下的 unitree_sdk2.md 中。
