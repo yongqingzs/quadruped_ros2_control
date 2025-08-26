@@ -523,9 +523,9 @@ double effort = controller.joint_effort_state_interface_[i].get_value();
 ```
 
 #### 参数说明
-- **domain**: DDS 域 ID，默认为 1
-- **network_interface**: 网络接口名称，默认为 "lo"
-- **show_foot_force**: 是否在日志中显示足端力数据，默认为 false
+- **domain**: DDS 域 ID，默认为 1，在 config 中设置为 0
+- **network_interface**: 网络接口名称，默认为 "lo"，在 config 中设置为 enp46s0
+- **show_foot_force**: 是否在日志中显示足端力数据，默认为 false，在 config 中设置为 true
 
 ### 8. 实时数据循环
 

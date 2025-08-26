@@ -130,4 +130,11 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 对比 hardware_unitree_sdk2 包和 unitree_ros2 包。不要摘录过多源码，使用叙述性文字和 Mermaid 图。完成以下任务：
 1. 说明这两个包之间的关系。hardware_unitree_sdk2 是基于 unitree_ros2 完成的吗？如果是的话，它添加了什么工作？
 2. 说明你觉得应当说明的内容。
-3. 将整理好的内容添加到 hardware_unitree_sdk2.md 中（不要修改现有 md 内容，只需要新增）。
+3. 将整理好的内容添加到 hardware_unitree_sdk2.md 中(不要修改现有 md 内容，只需要新增)。
+
+## task18
+分析并梳理 UnitreeSdk2Bridge 类中的代码。不要摘录过多源码，完成以下任务：
+1. 说明该类各个方法的功能。
+2. 着重说明其数据处理和更新的主要流程(其如何与外部交互，比如mujoco或其他)。
+3. 说明你觉得应当说明的内容。
+4. 将整理好的内容添加到 unitree_mujoco.md 中(不要修改现有 md 内容，只需要新增)。
