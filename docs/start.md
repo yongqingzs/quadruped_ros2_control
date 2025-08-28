@@ -7,6 +7,7 @@ base
 mkdir -p ~/jazzy_ws/src
 cd ~/jazzy_ws/src
 git clone https://github.com/legubiao/quadruped_ros2_control.git
+# git checkout 5434c5810d1a7fe223bcfd04550e9d3bfdd4b458
 
 cd ~/jazzy_ws
 rosdep install --from-paths src --ignore-src -r -y
@@ -20,8 +21,10 @@ ocs2_ros2
 ```bash
 cd ~/jazzy_ws/src
 git clone https://github.com/legubiao/ocs2_ros2
-
 cd ocs2_ros2
+# git checkout c6dc80d9745c5f167241fdfe3d21eb11bd59e0e7  # jazzy_ros2
+# git checkout 6a831c665d2c6106eabd37e5abe64aeebbbedf94  # rk3588
+
 git submodule update --init --recursive
 
 cd ../../
@@ -63,8 +66,8 @@ unitree mujoco
 # unitree_sdk2
 git clone https://github.com/unitreerobotics/unitree_sdk2.git
 cd unitree_sdk2/
-mkdir build
-cd build
+git checkout 3d7f4a57c169420301cfa12479789e5142342d8e  # may useful
+mkdir build && cd build
 cmake ..
 make -j4
 sudo make install
@@ -154,4 +157,20 @@ FetchContent_MakeAvailable(hpipmDownload)
 build
 ```bash
 MAKEFLAGS="-j1" colcon build --packages-up-to hpipm_colcon
+```
+
+- unitree_sdk2
+uninstall
+```bash
+cd build
+sudo xargs rm -f < install_manifest.txt
+```
+
+- ocs2
+```bash
+# 正常
+[ros2_control_node-3] [CppAdInterface] Loading Shared Library: /home/jazzy/ocs2_cpp_ad/go2/dynamics_systemFlowMap/cppad_generated/dynamics_systemFlowMap_lib.so
+
+# 不正常
+[ros2_control_node-3] [CppAdInterface] Compiling Shared Library: /home/cat/ocs2_cpp_ad/go2/dynamics_systemFlowMap/cppad_generated/dynamics_systemFlowMap_libcppadcg_tmp-89110158.so
 ```
