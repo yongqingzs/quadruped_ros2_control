@@ -288,3 +288,116 @@ class Test : public Jsonize {
 ## 9. 总结
 
 unitree_sdk2 是一个多层次的机器人软件开发框架，不仅仅是 DDS 的简单封装。它提供了从底层通信到高层业务逻辑的完整解决方案，通过合理的抽象设计既保证了易用性，又保持了足够的灵活性。SDK 的模块化设计使得开发者可以根据需要选择使用不同层次的接口，从简单的运动控制到复杂的自定义控制器开发都能得到良好的支持。
+
+## 10. 基于源码推断的 DDS 消息 IDL 定义
+
+基于 `HardwareUnitree.cpp` 中的使用模式，我们可以倒推出 `LowCmd_`、`LowState_` 和 `SportModeState_` 的 IDL 结构定义。以下是推断出的 IDL 格式（使用 CycloneDDS 兼容语法）：
+
+```cpp
+module unitree_go {
+module msg {
+module dds_ {
+
+// 电机状态结构体
+struct MotorState_ {
+    float q;           // 关节位置
+    float dq;          // 关节速度
+    float tau_est;     // 估计力矩
+};
+
+// 电机命令结构体
+struct MotorCmd_ {
+    octet mode;        // 控制模式
+    float q;           // 目标位置
+    float dq;          // 目标速度
+    float kp;          // 位置增益
+    float kd;          // 速度增益
+    float tau;         // 目标力矩
+};
+
+// IMU 状态结构体
+struct IMUState_ {
+    sequence<float, 4> quaternion;     // 四元数 [w, x, y, z]
+    sequence<float, 3> gyroscope;      // 陀螺仪 [x, y, z]
+    sequence<float, 3> accelerometer;  // 加速度计 [x, y, z]
+};
+
+// 底层状态消息
+struct LowState_ {
+    sequence<MotorState_, 12> motor_state;  // 12个关节的状态
+    IMUState_ imu_state;                    // IMU 数据
+    sequence<float, 4> foot_force;          // 足底力传感器 [FL, FR, RL, RR]
+};
+
+// 底层命令消息
+struct LowCmd_ {
+    sequence<octet, 2> head;             // 消息头 [0xFE, 0xEF]
+    octet level_flag;                    // 级别标志
+    unsigned long gpio;                  // GPIO 状态
+    sequence<MotorCmd_, 20> motor_cmd;   // 20个电机命令（实际使用12个）
+    unsigned long crc;                   // CRC 校验码
+};
+
+// 高层运动状态消息
+struct SportModeState_ {
+    sequence<float, 3> position;     // 机器人位置 [x, y, z]
+    sequence<float, 3> velocity;     // 机器人速度 [vx, vy, vz]
+};
+
+};
+};
+};
+```
+
+### 10.1 IDL 结构说明
+
+#### 10.1.1 MotorState_
+- **q**: 关节位置（弧度）
+- **dq**: 关节速度（弧度/秒）
+- **tau_est**: 估计的关节力矩（Nm）
+
+#### 10.1.2 MotorCmd_
+- **mode**: 控制模式（0x01表示伺服模式）
+- **q**: 目标关节位置
+- **dq**: 目标关节速度
+- **kp**: PD控制器位置增益
+- **kd**: PD控制器速度增益
+- **tau**: 目标力矩
+
+#### 10.1.3 IMUState_
+- **quaternion**: 姿态四元数，4个float值
+- **gyroscope**: 角速度，3个float值（rad/s）
+- **accelerometer**: 线加速度，3个float值（m/s²）
+
+#### 10.1.4 LowState_
+- **motor_state**: 12个关节的状态信息
+- **imu_state**: IMU传感器数据
+- **foot_force**: 4个足底力传感器值
+
+#### 10.1.5 LowCmd_
+- **head**: 固定的消息头标识符
+- **level_flag**: 控制级别标志
+- **gpio**: GPIO引脚状态
+- **motor_cmd**: 最多20个电机命令（Go2实际使用12个）
+- **crc**: 用于数据完整性校验的CRC值
+
+#### 10.1.6 SportModeState_
+- **position**: 机器人基座在世界坐标系中的位置
+- **velocity**: 机器人基座的速度
+
+### 10.2 推断依据
+
+这些 IDL 定义基于 `HardwareUnitree.cpp` 中的以下使用模式推断得出：
+
+1. **数组访问模式**：如 `motor_state()[i].q()` 表明 `motor_state` 是数组
+2. **字段访问模式**：如 `imu_state().quaternion()[0]` 表明 `quaternion` 是数组
+3. **数据类型**：通过赋值操作推断数据类型（如 `static_cast<float>()` 表明源类型）
+4. **数组长度**：通过循环次数和索引范围推断（如 12个关节、4个足底力）
+
+### 10.3 注意事项
+
+- 这些是基于现有代码使用模式的推断结果
+- 实际的 IDL 文件可能包含更多字段或不同的命名约定
+- `motor_cmd` 定义为20个元素，但代码中只使用了前12个
+- 某些字段的具体含义可能需要参考官方文档或实际硬件规格
+
