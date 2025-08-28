@@ -22,8 +22,7 @@ ocs2_ros2
 cd ~/jazzy_ws/src
 git clone https://github.com/legubiao/ocs2_ros2
 cd ocs2_ros2
-# git checkout c6dc80d9745c5f167241fdfe3d21eb11bd59e0e7  # jazzy_ros2
-# git checkout 6a831c665d2c6106eabd37e5abe64aeebbbedf94  # rk3588
+# git checkout bac496f915f3b6a9c859b8989e3d6b6f56970271
 
 git submodule update --init --recursive
 

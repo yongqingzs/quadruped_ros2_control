@@ -145,3 +145,18 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 2. 说明各类中各个方法的功能。
 3. 说明你觉得应当说明的内容。
 4. 将整理好的内容输出到 perceptive.md 中。
+
+## task20
+分析并梳理 unitree_sdk2 包中的代码。不要摘录过多源码，完成以下任务：
+1. 分析 unitree_sdk2/include/unitree 实现的功能，并着重说明其关键类和方法
+2. 分析以下例程，包括其实现的功能和使用说明
+- unitree_sdk2/example/go2、 
+- unitree_sdk2/example/jsonize
+- unitree_sdk2/example/state_machine
+- unitree_sdk2/example/wireless_controller
+3. 依据你的分析，回答以下问题
+- unitree_sdk2 只是对 dds 进行了封装，提供类似发布者订阅者的接口？
+- unitree_sdk2 为什么要对 dds 进行了封装？
+- unitree_sdk2 是否支持不同的 dds(如: fast dds、cyclone dds)？
+4. 说明你觉得应当说明的内容。
+5. 将整理好的内容添加到 unitree_sdk2.md 中(不要修改现有 md 内容，只需要新增)。
