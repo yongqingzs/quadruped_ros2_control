@@ -7,7 +7,7 @@ base
 mkdir -p ~/jazzy_ws/src
 cd ~/jazzy_ws/src
 git clone https://github.com/legubiao/quadruped_ros2_control.git
-# git checkout 5434c5810d1a7fe223bcfd04550e9d3bfdd4b458
+git checkout 5434c5810d1a7fe223bcfd04550e9d3bfdd4b458
 
 cd ~/jazzy_ws
 rosdep install --from-paths src --ignore-src -r -y
@@ -22,7 +22,7 @@ ocs2_ros2
 cd ~/jazzy_ws/src
 git clone https://github.com/legubiao/ocs2_ros2
 cd ocs2_ros2
-# git checkout bac496f915f3b6a9c859b8989e3d6b6f56970271
+git checkout bac496f915f3b6a9c859b8989e3d6b6f56970271
 
 git submodule update --init --recursive
 
@@ -53,6 +53,7 @@ sudo apt install libglfw3-dev libxinerama-dev libxcursor-dev libxi-dev libyaml-c
 cd ~/jazzy_ws/src
 git clone https://github.com/google-deepmind/mujoco.git
 cd mujoco
+git checkout d77ecb3f064678cc9227cdb8e0f5fccad97569fc
 mkdir build && cd build
 cmake ..
 make -j4
@@ -76,6 +77,7 @@ sudo apt update
 sudo apt install libglfw3 libglfw3-dev
 
 git clone https://github.com/legubiao/unitree_mujoco
+git checkout 1fda65800287c369001da5e07ebd4652470f22f3
 cd unitree_mujoco/simulate
 mkdir build && cd build
 cmake ..
@@ -140,7 +142,7 @@ else()
 endif()
 
 ## fix2
-set(TARGET "GENERIC")
+set(TARGET "GENERIC" CACHE STRING "Target architecture" FORCE)
 FetchContent_Declare(hpipmDownload
         GIT_REPOSITORY https://github.com/giaf/hpipm
         GIT_TAG ${GIT_TAG}
