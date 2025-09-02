@@ -160,3 +160,21 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 - unitree_sdk2 是否支持不同的 dds(如: fast dds、cyclone dds)？
 4. 说明你觉得应当说明的内容。
 5. 将整理好的内容添加到 unitree_sdk2.md 中(不要修改现有 md 内容，只需要新增)。
+
+## task21
+分析并梳理 wbc 目录中的代码。不要摘录过多源码，完成以下任务：
+1. 说明该目录下代码实现的功能，其数据处理和更新的主要流程。
+- 说明涉及每次处理前和处理后数据的具体形式，类似:
+```txt
+估计的 base 姿态(欧拉角): 3  转换测量值zyx
+估计的 base 位置:  3  xHat_
+关节角度:  12  测量值joint_pos
+估计的 base 全局角速度:  3  转换测量值angularVel
+估计的 base 线速度:  3  xHat_
+关节角速度:  12  测量值joint_vel
+```
+- 说明哪个类的哪个方法参与了数据处理
+- 说明足端力传感器起到什么作用，是否参与计算，是否必需
+2. 说明各类中各个方法的功能。需要着重说明 WeightedWbc 类。
+3. 说明你觉得应当说明的内容。
+4. 将整理好的内容输出到 wbc.md 中(不要新创建 wbc.md，输出到现有的 wbc.md )。
