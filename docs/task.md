@@ -178,3 +178,12 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 2. 说明各类中各个方法的功能。需要着重说明 WeightedWbc 类。
 3. 说明你觉得应当说明的内容。
 4. 将整理好的内容输出到 wbc.md 中(不要新创建 wbc.md，输出到现有的 wbc.md )。
+
+## task22
+分析并梳理 SwingTrajectoryPlanner 类中的代码。不要摘录过多源码，完成以下任务：
+1. 说明其数据处理和更新的主要流程。并绘制流程图(可以用 Mermaid 表示，但也需用文字表述流程)。
+2. 说明数据的输入输出分别和什么模块交互。
+3. 说明类中各个方法的功能。
+4. 说明该模块的作用，和代表的机理。
+5. 说明你觉得应当说明的内容。
+6. 将整理好的内容输出到 SwingTrajectoryPlanner.md 中(不要新创建 SwingTrajectoryPlanner.md，输出到现有的 SwingTrajectoryPlanner.md )。
