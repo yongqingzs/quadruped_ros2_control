@@ -197,3 +197,12 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 3. 说明调参建议(针对算法相关参数，逐一说明)。
 4. 说明你觉得应当说明的内容。
 5. 将整理好的内容输出到 docs/task_info.md 中。
+
+## task24
+分析 unitree_guide_controller/Estimator。完成以下任务：
+1. 说明该类各个方法的功能(着重说明其数据处理和更新的主要流程)。
+2. 说明其与 ocs2_quadruped_controller/LinearKalmanFilter 的区别。
+- ocs2_quadruped_controller/LinearKalmanFilter 是否可替换为 unitree_guide_controller/Estimator。如果可以，给出对接流程。
+- ocs2_quadruped_controller/LinearKalmanFilter 中需要用到足端接触力的数据，是否有方式替代足端接触力的使用。
+3. 说明你觉得应当说明的内容。
+4. 将整理好的内容输出到 unitree_guide/class/Estimator.md 中。
