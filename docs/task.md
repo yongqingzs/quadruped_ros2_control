@@ -187,3 +187,13 @@ ros2 launch ocs2_quadruped_controller mujoco.launch.py pkg_description:=go2_desc
 4. 说明该模块的作用，和代表的机理。
 5. 说明你觉得应当说明的内容。
 6. 将整理好的内容输出到 SwingTrajectoryPlanner.md 中(不要新创建 SwingTrajectoryPlanner.md，输出到现有的 SwingTrajectoryPlanner.md )。
+
+## task23
+分析 task.info。完成以下任务：
+1. 说明各参数被哪个类最终使用了(如果有多个类使用，也请说明)
+- 提示: task.info 在代码里会被类似"taskfile"等加载
+- 指出各参数作用
+2. 说明各参数的物理意义(针对算法相关参数，逐一说明)。
+3. 说明调参建议(针对算法相关参数，逐一说明)。
+4. 说明你觉得应当说明的内容。
+5. 将整理好的内容输出到 docs/task_info.md 中。
