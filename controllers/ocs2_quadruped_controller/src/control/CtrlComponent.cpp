@@ -11,6 +11,7 @@
 #include <ocs2_quadruped_controller/estimator/FromOdomTopic.h>
 #include <ocs2_quadruped_controller/estimator/GroundTruth.h>
 #include <ocs2_quadruped_controller/estimator/LinearKalmanFilter.h>
+#include <ocs2_quadruped_controller/estimator/GaitBasedKalmanFilter.h>
 
 #include <ocs2_centroidal_model/CentroidalModelRbdConversions.h>
 #include <ocs2_core/thread_support/ExecuteAndSleep.h>
@@ -88,6 +89,16 @@ namespace ocs2::legged_robot
                 node_);
             dynamic_cast<KalmanFilterEstimate&>(*estimator_).loadSettings(task_file_, verbose_);
             RCLCPP_INFO(node_->get_logger(), "Using Kalman Filter Estimator");
+        }
+        else if (estimator_type == "gait_based_kalman")
+        {
+            estimator_ = std::make_unique<GaitBasedKalmanFilter>(
+                legged_interface_->getPinocchioInterface(),
+                legged_interface_->getCentroidalModelInfo(),
+                *ee_kinematics_, ctrl_interfaces_,
+                node_, legged_interface_->getSwitchedModelReferenceManagerPtr());
+            dynamic_cast<GaitBasedKalmanFilter&>(*estimator_).loadSettings(task_file_, verbose_);
+            RCLCPP_INFO(node_->get_logger(), "Using Gait Based Kalman Filter Estimator");
         }
         else
         {
