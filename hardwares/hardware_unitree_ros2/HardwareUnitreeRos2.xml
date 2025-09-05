@@ -1,0 +1,7 @@
+<library path="hardware_unitree_ros2">
+  <class name="hardware_unitree_ros2/HardwareUnitreeRos2" type="HardwareUnitreeRos2" base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ROS2 hardware interface for Unitree quadruped robots using ROS2 messages
+    </description>
+  </class>
+</library>
