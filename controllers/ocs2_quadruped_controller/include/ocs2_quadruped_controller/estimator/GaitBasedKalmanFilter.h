@@ -22,11 +22,14 @@ namespace ocs2::legged_robot
                               const PinocchioEndEffectorKinematics& ee_kinematics,
                               CtrlInterfaces& ctrl_interfaces,
                               const rclcpp_lifecycle::LifecycleNode::SharedPtr& node,
-                              const std::shared_ptr<SwitchedModelReferenceManager>& referenceManagerPtr);
+                              const std::shared_ptr<SwitchedModelReferenceManager>& referenceManagerPtr,
+                              const scalar_t& obs_time);
 
         vector_t update(const rclcpp::Time& time, const rclcpp::Duration& period) override;
 
         void loadSettings(const std::string& task_file, bool verbose);
+
+        bool verbose_ = false;
 
     protected:
         nav_msgs::msg::Odometry getOdomMsg();
@@ -34,6 +37,7 @@ namespace ocs2::legged_robot
         PinocchioInterface pinocchio_interface_;
         std::unique_ptr<PinocchioEndEffectorKinematics> ee_kinematics_;
         std::shared_ptr<SwitchedModelReferenceManager> referenceManagerPtr_;
+        const scalar_t& obs_time_;
 
         vector_t feet_heights_;
 

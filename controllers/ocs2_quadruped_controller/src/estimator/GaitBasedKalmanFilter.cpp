@@ -20,7 +20,8 @@ namespace ocs2::legged_robot
                                                  const PinocchioEndEffectorKinematics& ee_kinematics,
                                                  CtrlInterfaces& ctrl_interfaces,
                                                  const rclcpp_lifecycle::LifecycleNode::SharedPtr& node,
-                                                 const std::shared_ptr<SwitchedModelReferenceManager>& referenceManagerPtr)
+                                                 const std::shared_ptr<SwitchedModelReferenceManager>& referenceManagerPtr,
+                                                 const scalar_t& obs_time)
         : StateEstimateBase(std::move(info), ctrl_interfaces, node),
           pinocchio_interface_(std::move(pinocchio_interface)),
           ee_kinematics_(ee_kinematics.clone()),
@@ -28,7 +29,8 @@ namespace ocs2::legged_robot
           numContacts_(info_.numThreeDofContacts + info_.numSixDofContacts),
           dimContacts_(3 * numContacts_),
           numState_(6 + dimContacts_),
-          numObserve_(2 * dimContacts_ + numContacts_)
+          numObserve_(2 * dimContacts_ + numContacts_),
+          obs_time_(obs_time)
     {
         xHat_.setZero(numState_);
         ps_.setZero(dimContacts_);
@@ -55,6 +57,8 @@ namespace ocs2::legged_robot
 
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
+
+        verbose_ = true;
     }
 
     vector_t GaitBasedKalmanFilter::update(const rclcpp::Time& time, const rclcpp::Duration& period)
@@ -80,15 +84,22 @@ namespace ocs2::legged_robot
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastPrintTime);
 
-        contact_flag_ = referenceManagerPtr_->getContactFlags(0);
-        if (elapsed.count() >= 3) {
+        contact_flag_ = referenceManagerPtr_->getContactFlags(obs_time_);
+        if (elapsed.count() >= 3 && verbose_) {
+            std::cout << "obs_time_: " << obs_time_ << std::endl; 
             std::cout << "getContactFlags: ";
             printContactFlags(contact_flag_);
-        }
-        updateContact();
-        if (elapsed.count() >= 3) {
-            std::cout << "updateContact: ";
-            printContactFlags(contact_flag_);
+
+            std::cout << "tmpContactFlags: ";
+            contact_flag_t tmp_flag;
+            const size_t size = ctrl_component_.foot_force_state_interface_.size();
+            for (int i = 0; i < size; i++)
+            {
+                tmp_flag[i] = ctrl_component_.foot_force_state_interface_[i].get().get_optional().value() >
+                    feet_force_threshold_;
+            }
+            // updateContact();
+            printContactFlags(tmp_flag);
 
             lastPrintTime = now; // 更新上次打印时间
         }

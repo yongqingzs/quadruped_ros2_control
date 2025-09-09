@@ -5,6 +5,7 @@
 
 		<hardware>
 			<plugin>hardware_unitree_sdk2/HardwareUnitree</plugin>
+			<!-- <plugin>hardware_unitree_ros2/HardwareUnitreeRos2</plugin> -->
 <!--			<param name="domain">0</param>-->
 <!--			<param name="network_interface">enp46s0</param>-->
 <!--			<param name="show_foot_force">true</param>-->
