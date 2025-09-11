@@ -1,9 +1,10 @@
 //
-// DDS-ROS2 Bridge Node Implementation for hardware_unitree_ros2
+// DDS-ROS2 Bridge Node Implementation for hardware_unitree
 //
 
-#include "hardware_unitree_ros2/dds_ros2_bridge_node.h"
+#include "hardware_unitree_ros2/HardwareRos2Bridge.h"
 #include <unitree/robot/channel/channel_factory.hpp>
+#include <csignal>
 
 using namespace unitree::robot;
 
@@ -16,14 +17,18 @@ DdsRos2BridgeNode::DdsRos2BridgeNode(const rclcpp::NodeOptions& options)
     declare_parameter("network_interface", "lo");
     declare_parameter("domain", 1);
     declare_parameter("debug_output", false);
+    declare_parameter("log_flag", false);
+    declare_parameter("logging_duration", 3);  // New parameter for logging duration
 
     // Get parameters
     network_interface_ = get_parameter("network_interface").as_string();
     domain_ = get_parameter("domain").as_int();
     debug_output_ = get_parameter("debug_output").as_bool();
+    log_flag_ = get_parameter("log_flag").as_bool();
+    logging_duration_ = get_parameter("logging_duration").as_int();  // Get logging duration
 
-    RCLCPP_INFO(get_logger(), "DDS-ROS2 Bridge Node starting with interface: %s, domain: %d", 
-                network_interface_.c_str(), domain_);
+    RCLCPP_INFO(get_logger(), "DDS-ROS2 Bridge Node starting with interface: %s, domain: %d, log_flag: %s", 
+                network_interface_.c_str(), domain_, log_flag_ ? "true" : "false");
 }
 
 DdsRos2BridgeNode::~DdsRos2BridgeNode()
@@ -59,6 +64,15 @@ bool DdsRos2BridgeNode::initialize()
             ROS2_TOPIC_LOWCMD, qos,
             [this](const unitree_go::msg::LowCmd::SharedPtr msg) { ros2LowCmdHandler(msg); });
 
+        // Subscribe to control inputs for data logging (if enabled)
+        if (log_flag_) {
+            control_inputs_subscriber_ = create_subscription<control_input_msgs::msg::Inputs>(
+                "control_input", qos,
+                [this](const control_input_msgs::msg::Inputs::SharedPtr msg) { controlInputsHandler(msg); });
+            
+            RCLCPP_INFO(get_logger(), "Data logging enabled - subscribed to control inputs");
+        }
+
         active_ = true;
         
         RCLCPP_INFO(get_logger(), "DDS-ROS2 Bridge Node initialized successfully");
@@ -74,6 +88,11 @@ void DdsRos2BridgeNode::shutdown()
 {
     active_ = false;
     
+    // Stop any ongoing logging
+    if (is_logging_) {
+        stopDataLogging();
+    }
+    
     // Reset DDS publishers and subscribers
     dds_low_cmd_publisher_.reset();
     dds_low_state_subscriber_.reset();
@@ -83,6 +102,12 @@ void DdsRos2BridgeNode::shutdown()
     ros2_low_state_publisher_.reset();
     ros2_high_state_publisher_.reset();
     ros2_low_cmd_subscriber_.reset();
+    control_inputs_subscriber_.reset();
+    
+    // Reset logging timer
+    if (logging_timer_) {
+        logging_timer_.reset();
+    }
     
     RCLCPP_INFO(get_logger(), "DDS-ROS2 Bridge Node shutdown complete");
 }
@@ -98,6 +123,11 @@ void DdsRos2BridgeNode::ddsLowStateHandler(const void* message)
         
         auto ros2_low_state = std::make_unique<unitree_go::msg::LowState>();
         convertDdsToRos2LowState(dds_low_state, *ros2_low_state);
+        
+        // Record data if logging is active
+        if (is_logging_ && log_flag_) {
+            recordData(*ros2_low_state, last_low_cmd_);
+        }
         
         if (ros2_low_state_publisher_) {
             ros2_low_state_publisher_->publish(*ros2_low_state);
@@ -143,6 +173,9 @@ void DdsRos2BridgeNode::ros2LowCmdHandler(const unitree_go::msg::LowCmd::SharedP
     
     try {
         std::lock_guard<std::mutex> lock(state_mutex_);
+        
+        // Store the latest low command for logging
+        last_low_cmd_ = *msg;
         
         unitree_go::msg::dds_::LowCmd_ dds_low_cmd;
         convertRos2ToDdsLowCmd(*msg, dds_low_cmd);
@@ -402,4 +435,227 @@ void DdsRos2BridgeNode::convertRos2ToDdsLowCmd(const unitree_go::msg::LowCmd& ro
     // CRC will be calculated by caller
 }
 
+void DdsRos2BridgeNode::controlInputsHandler(const control_input_msgs::msg::Inputs::SharedPtr msg)
+{
+    if (!log_flag_) return;
+    if (msg->command == 0) return;
+
+    int32_t current_command = msg->command;
+    int32_t expected_last_command = last_command_.load();
+    std::cout << "Current command: " << current_command << ", Last command: " << expected_last_command << std::endl;
+
+    if (expected_last_command <= 1 && current_command == 1) {
+        // First command received, just store it
+        last_command_.store(current_command);
+        return;
+    }
+
+    // Check if command has changed
+    if (expected_last_command != current_command) {
+        last_command_.store(current_command);
+
+        RCLCPP_INFO(get_logger(), "Control command changed from %d to %d - starting %d seconds data logging", 
+                    expected_last_command, current_command, logging_duration_);
+
+        startDataLogging();
+    }
+}
+
+void DdsRos2BridgeNode::startDataLogging()
+{
+    std::lock_guard<std::mutex> lock(logging_mutex_);
+    if (is_logging_) {
+        if (logging_timer_) {
+            logging_timer_->cancel();
+        }
+    } else {
+        logged_data_.clear();
+        is_logging_ = true;
+    }
+    // 使用 node clock 保证时间源一致
+    auto node_clock = this->get_clock();
+    logging_start_time_ = node_clock->now();
+    last_record_time_ = node_clock->now();
+    logging_timer_ = create_wall_timer(
+        std::chrono::seconds(logging_duration_),
+        [this]() { stopDataLogging(); });
+    RCLCPP_INFO(get_logger(), "Started data logging for %d seconds", logging_duration_);
+}
+
+void DdsRos2BridgeNode::stopDataLogging()
+{
+    std::lock_guard<std::mutex> lock(logging_mutex_);
+    
+    if (!is_logging_) return;
+    
+    is_logging_ = false;
+    
+    if (logging_timer_) {
+        logging_timer_->cancel();
+        logging_timer_.reset();
+    }
+    
+    RCLCPP_INFO(get_logger(), "Stopped data logging. Recorded %zu data points", logged_data_.size());
+    
+    // Save logged data to CSV
+    saveLoggedDataToCsv();
+}
+
+void DdsRos2BridgeNode::recordData(const unitree_go::msg::LowState& low_state, const unitree_go::msg::LowCmd& low_cmd)
+{
+    if (!is_logging_) return;
+    std::lock_guard<std::mutex> lock(logging_mutex_);
+    auto node_clock = this->get_clock();
+    // Add data to a temporary buffer
+    LoggedData data;
+    data.timestamp = (node_clock->now() - logging_start_time_).seconds();
+    data.low_state = low_state;
+    data.low_cmd = low_cmd;
+    temp_buffer_.push_back(data);
+    // Only save to logged_data_ every 10ms (100Hz)
+    auto now_time = node_clock->now();
+    if ((now_time - last_record_time_).seconds() >= 0.01) {
+        logged_data_.insert(logged_data_.end(), temp_buffer_.begin(), temp_buffer_.end());
+        temp_buffer_.clear();
+        last_record_time_ = now_time;
+    }
+
+    // Limit logged_data_ size to prevent excessive memory usage
+    // if (logged_data_.size() > 1000) {
+    //     logged_data_.pop_front();
+    // }
+}
+
+void DdsRos2BridgeNode::saveLoggedDataToCsv()
+{
+    if (logged_data_.empty()) {
+        RCLCPP_WARN(get_logger(), "No data to save");
+        return;
+    }
+    
+    // Generate filename with timestamp
+    auto now_time = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now_time);
+    std::stringstream ss;
+    ss << "data/logged_data_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".csv";
+    std::string filename = ss.str();
+    
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        RCLCPP_ERROR(get_logger(), "Failed to open file %s for writing", filename.c_str());
+        return;
+    }
+    
+    // Write CSV header
+    file << "timestamp,";
+    
+    // Low state headers
+    file << "imu_quat_w,imu_quat_x,imu_quat_y,imu_quat_z,";
+    file << "imu_gyro_x,imu_gyro_y,imu_gyro_z,";
+    file << "imu_accel_x,imu_accel_y,imu_accel_z,";
+    file << "imu_rpy_r,imu_rpy_p,imu_rpy_y,";
+    file << "imu_temperature,";
+    
+    // Motor state headers (20 motors)
+    for (int i = 0; i < 20; ++i) {
+        file << "motor_" << i << "_mode,motor_" << i << "_q,motor_" << i << "_dq,motor_" << i << "_ddq,";
+        file << "motor_" << i << "_tau,motor_" << i << "_temperature,";
+    }
+    
+    // Motor command headers (20 motors)
+    for (int i = 0; i < 20; ++i) {
+        file << "cmd_motor_" << i << "_mode,cmd_motor_" << i << "_q,cmd_motor_" << i << "_dq,";
+        file << "cmd_motor_" << i << "_tau,cmd_motor_" << i << "_kp,cmd_motor_" << i << "_kd,";
+    }
+    
+    file << "\n";
+    
+    // Write data
+    for (const auto& data : logged_data_) {
+        file << std::fixed << std::setprecision(6) << data.timestamp << ",";
+        
+        // IMU data
+        const auto& imu = data.low_state.imu_state;
+        file << imu.quaternion[0] << "," << imu.quaternion[1] << "," << imu.quaternion[2] << "," << imu.quaternion[3] << ",";
+        file << imu.gyroscope[0] << "," << imu.gyroscope[1] << "," << imu.gyroscope[2] << ",";
+        file << imu.accelerometer[0] << "," << imu.accelerometer[1] << "," << imu.accelerometer[2] << ",";
+        file << imu.rpy[0] << "," << imu.rpy[1] << "," << imu.rpy[2] << ",";
+        file << imu.temperature << ",";
+        
+        // Motor states
+        for (int i = 0; i < 20; ++i) {
+            const auto& motor = data.low_state.motor_state[i];
+            file << motor.mode << "," << motor.q << "," << motor.dq << "," << motor.ddq << ",";
+            file << motor.tau_est << "," << motor.temperature << ",";
+        }
+        
+        // Motor commands
+        for (int i = 0; i < 20; ++i) {
+            const auto& cmd = data.low_cmd.motor_cmd[i];
+            file << cmd.mode << "," << cmd.q << "," << cmd.dq << ",";
+            file << cmd.tau << "," << cmd.kp << "," << cmd.kd << ",";
+        }
+        
+        file << "\n";
+    }
+    
+    file.close();
+    
+    RCLCPP_INFO(get_logger(), "Saved %zu data points to %s", logged_data_.size(), filename.c_str());
+    
+    // Clear logged data to free memory
+    logged_data_.clear();
+}
+
 } // namespace hardware_unitree_ros2
+
+std::shared_ptr<hardware_unitree_ros2::DdsRos2BridgeNode> g_bridge_node = nullptr;
+
+void signalHandler(int signal) {
+    if (g_bridge_node) {
+        RCLCPP_INFO(g_bridge_node->get_logger(), "Received signal %d, shutting down...", signal);
+        g_bridge_node->shutdown();
+        rclcpp::shutdown();
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    rclcpp::init(argc, argv);
+    
+    // Install signal handlers
+    std::signal(SIGINT, signalHandler);
+    std::signal(SIGTERM, signalHandler);
+    
+    try {
+        // Create bridge node
+        auto options = rclcpp::NodeOptions();
+        g_bridge_node = std::make_shared<hardware_unitree_ros2::DdsRos2BridgeNode>(options);
+        
+        // Initialize the bridge
+        if (!g_bridge_node->initialize()) {
+            RCLCPP_ERROR(g_bridge_node->get_logger(), "Failed to initialize DDS-ROS2 bridge");
+            return 1;
+        }
+        
+        RCLCPP_INFO(g_bridge_node->get_logger(), "DDS-ROS2 Bridge Node is running...");
+        RCLCPP_INFO(g_bridge_node->get_logger(), "Bridge Topics:");
+        RCLCPP_INFO(g_bridge_node->get_logger(), "  DDS -> ROS2: rt/lowstate -> unitree_go/low_state");
+        RCLCPP_INFO(g_bridge_node->get_logger(), "  DDS -> ROS2: rt/sportmodestate -> unitree_go/high_state");
+        RCLCPP_INFO(g_bridge_node->get_logger(), "  ROS2 -> DDS: unitree_go/low_cmd -> rt/lowcmd");
+        
+        // Spin the node
+        rclcpp::spin(g_bridge_node);
+        
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(rclcpp::get_logger("main"), "Exception in main: %s", e.what());
+        return 1;
+    }
+    
+    if (g_bridge_node) {
+        g_bridge_node->shutdown();
+    }
+    
+    rclcpp::shutdown();
+    return 0;
+}

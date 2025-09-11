@@ -14,6 +14,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
         rclcpp
         rclcpp_lifecycle
         unitree_go
+        control_input_msgs
 )
 
 # find dependencies
@@ -46,7 +47,7 @@ ament_target_dependencies(
 pluginlib_export_plugin_description_file(hardware_interface HardwareUnitreeRos2.xml)
 
 # Add DDS-ROS2 bridge node
-add_executable(dds_ros2_bridge_node src/dds_ros2_bridge_node_main.cpp src/dds_ros2_bridge_node.cpp)
+add_executable(dds_ros2_bridge_node src/HardwareRos2Bridge.cpp)
 target_include_directories(dds_ros2_bridge_node PRIVATE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
 )

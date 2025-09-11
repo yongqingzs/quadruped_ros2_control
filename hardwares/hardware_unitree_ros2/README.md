@@ -215,3 +215,210 @@ The bridge node acts as a translation layer, enabling seamless integration betwe
 - `hardware_unitree_sdk2`: DDS-based hardware interface
 - `unitree_go`: ROS2 message definitions for Unitree robots
 - `ros2_control`: Robot control framework
+
+# Data Logging Feature for DDS-ROS2 Bridge
+
+## Overview
+
+This document describes the data logging functionality added to the `dds_ros2_bridge_node` as part of Task 29. The system automatically logs robot state and command data when control input commands change.
+
+## Features
+
+- **Automatic Trigger**: Data logging is triggered when the `command` field in `control_input_msgs::msg::Inputs` changes
+- **10-Second Recording**: Records 10 seconds of data after each command change
+- **Comprehensive Data**: Logs both `low_state` and `low_cmd` data with timestamps
+- **CSV Export**: Automatically saves data to timestamped CSV files
+- **Python Visualization**: Included script for plotting and analyzing logged data
+
+## Configuration
+
+### Parameters
+
+- `log_flag` (bool, default: false): Enable/disable data logging functionality
+- `network_interface` (string, default: "lo"): DDS network interface
+- `domain` (int, default: 1): DDS domain ID
+- `debug_output` (bool, default: false): Enable debug logging
+
+### Topics
+
+- **Subscribed**: `control_inputs` (`control_input_msgs::msg::Inputs`)
+- **Published**: `unitree_go/low_state`, `unitree_go/high_state`
+- **Subscribed**: `unitree_go/low_cmd`
+
+## Usage
+
+### Basic Launch (without logging)
+
+```bash
+ros2 launch hardware_unitree_ros2 dds_ros2_bridge.launch.py
+```
+
+### Launch with Data Logging
+
+```bash
+# Option 1: Using parameter
+ros2 launch hardware_unitree_ros2 dds_ros2_bridge.launch.py log_flag:=true
+
+# Option 2: Using dedicated launch file
+ros2 launch hardware_unitree_ros2 dds_ros2_bridge_with_logging.launch.py
+```
+
+### Publishing Control Commands
+
+To trigger data logging, publish to the control inputs topic:
+
+```bash
+# Example: Change command from 0 to 1
+ros2 topic pub /control_inputs control_input_msgs/msg/Inputs "{command: 1, lx: 0.0, ly: 0.0, rx: 0.0, ry: 0.0}"
+
+# Change to command 2 (will trigger another 10s recording)
+ros2 topic pub /control_inputs control_input_msgs/msg/Inputs "{command: 2, lx: 0.0, ly: 0.0, rx: 0.0, ry: 0.0}"
+```
+
+## Data Format
+
+### CSV Structure
+
+The generated CSV files contain the following columns:
+
+#### Metadata
+- `timestamp`: Time since logging started (seconds)
+
+#### IMU Data
+- `imu_quat_w`, `imu_quat_x`, `imu_quat_y`, `imu_quat_z`: Quaternion orientation
+- `imu_gyro_x`, `imu_gyro_y`, `imu_gyro_z`: Angular velocity (rad/s)
+- `imu_accel_x`, `imu_accel_y`, `imu_accel_z`: Linear acceleration (m/s²)
+- `imu_rpy_r`, `imu_rpy_p`, `imu_rpy_y`: Roll, pitch, yaw angles (rad)
+- `imu_temperature`: IMU temperature (°C)
+
+#### Motor State Data (for each of 20 motors)
+- `motor_N_mode`: Motor control mode
+- `motor_N_q`: Joint position (rad)
+- `motor_N_dq`: Joint velocity (rad/s)
+- `motor_N_ddq`: Joint acceleration (rad/s²)
+- `motor_N_tau`: Estimated torque (Nm)
+- `motor_N_w`: Motor angular velocity
+- `motor_N_temperature`: Motor temperature (°C)
+
+#### Motor Command Data (for each of 20 motors)
+- `cmd_motor_N_mode`: Commanded control mode
+- `cmd_motor_N_q`: Commanded position (rad)
+- `cmd_motor_N_dq`: Commanded velocity (rad/s)
+- `cmd_motor_N_tau`: Commanded torque (Nm)
+- `cmd_motor_N_kp`: Position gain
+- `cmd_motor_N_kd`: Derivative gain
+
+### File Naming
+
+CSV files are automatically named with timestamps:
+```
+logged_data_YYYYMMDD_HHMMSS.csv
+```
+
+Example: `logged_data_20250129_143052.csv`
+
+## Data Visualization
+
+Use the included Python script to visualize logged data:
+
+```bash
+# Basic usage
+python3 scripts/visualize_logged_data.py logged_data_20250129_143052.csv
+
+# Save plots as PNG files
+python3 scripts/visualize_logged_data.py logged_data_20250129_143052.csv --save
+
+# Focus on specific motor
+python3 scripts/visualize_logged_data.py logged_data_20250129_143052.csv --motor-id 5
+
+# Show help
+python3 scripts/visualize_logged_data.py --help
+```
+
+### Generated Plots
+
+1. **IMU Data**: Quaternion, gyroscope, accelerometer, and RPY plots
+2. **Motor Overview**: All motor positions and torques
+3. **Detailed Motor Data**: Position, velocity, torque, temperature, and gains for specified motor
+
+### Dependencies
+
+The visualization script requires:
+```bash
+pip install pandas matplotlib numpy
+```
+
+## Implementation Details
+
+### Logging Trigger
+
+- Monitors `control_input_msgs::msg::Inputs.command` field
+- Triggers when command value changes from previous value
+- Supports any integer command values
+- Initial command value of -1 ensures first command always triggers logging
+
+### Data Recording
+
+- Records at the rate of incoming `low_state` messages (~100Hz)
+- Stores last 10 seconds of data (up to 1000 samples)
+- Uses circular buffer to prevent excessive memory usage
+- Thread-safe recording with mutex protection
+
+### File Output
+
+- CSV files written to current working directory
+- Automatic timestamp generation for unique filenames
+- High precision (6 decimal places) for timestamp data
+- Standard CSV format compatible with Excel, MATLAB, Python pandas
+
+## Examples
+
+### Example Launch Sequence
+
+1. Start the bridge with logging:
+```bash
+ros2 launch hardware_unitree_ros2 dds_ros2_bridge_with_logging.launch.py
+```
+
+2. In another terminal, publish a command change:
+```bash
+ros2 topic pub /control_inputs control_input_msgs/msg/Inputs "{command: 1, lx: 0.5, ly: 0.0, rx: 0.0, ry: 0.0}"
+```
+
+3. Wait 10 seconds for logging to complete, then visualize:
+```bash
+python3 scripts/visualize_logged_data.py logged_data_*.csv --save
+```
+
+### Integration with Existing System
+
+This logging system integrates seamlessly with existing hardware_unitree_ros2 operations:
+
+- Does not interfere with normal DDS-ROS2 message bridging
+- Minimal performance impact when logging disabled
+- Compatible with all existing launch configurations
+- Can be enabled/disabled via parameter without code changes
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No CSV files generated**: Ensure `log_flag` is set to `true` and control inputs are being published
+2. **Permission errors**: Ensure write permissions in current directory
+3. **Visualization errors**: Install required Python packages (pandas, matplotlib, numpy)
+4. **Missing motor data**: Check that both low_state and low_cmd topics are active
+
+### Debug Information
+
+Enable debug output to see logging status:
+```bash
+ros2 launch hardware_unitree_ros2 dds_ros2_bridge_with_logging.launch.py debug_output:=true
+```
+
+Look for log messages like:
+- "Data logging enabled - subscribed to control inputs"
+- "Control command changed from X to Y - starting 10s data logging"
+- "Started data logging for 10 seconds"
+- "Stopped data logging. Recorded N data points"
+- "Saved N data points to filename.csv"
+

@@ -16,13 +16,18 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'domain',
-            default_value='1',
+            default_value='19',
             description='DDS domain ID'
         ),
         DeclareLaunchArgument(
             'debug_output',
             default_value='false',
             description='Enable debug output'
+        ),
+        DeclareLaunchArgument(
+            'log_flag',
+            default_value='true',
+            description='Enable data logging when control commands change'
         ),
         
         # DDS-ROS2 Bridge Node
@@ -35,6 +40,7 @@ def generate_launch_description():
                 'network_interface': LaunchConfiguration('network_interface'),
                 'domain': LaunchConfiguration('domain'),
                 'debug_output': LaunchConfiguration('debug_output'),
+                'log_flag': LaunchConfiguration('log_flag'),
             }],
             remappings=[
                 # You can add topic remappings here if needed
