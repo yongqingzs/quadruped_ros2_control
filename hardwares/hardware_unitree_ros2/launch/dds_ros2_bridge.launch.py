@@ -26,7 +26,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'log_flag',
-            default_value='true',
+            default_value='false',
             description='Enable data logging when control commands change'
         ),
         

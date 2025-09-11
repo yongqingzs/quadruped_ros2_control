@@ -54,6 +54,13 @@ target_include_directories(dds_ros2_bridge_node PRIVATE
 target_link_libraries(dds_ros2_bridge_node unitree_sdk2)
 ament_target_dependencies(dds_ros2_bridge_node ${THIS_PACKAGE_INCLUDE_DEPENDS})
 
+# Add Data Logger node
+add_executable(data_logger_node src/DataLoggerNode.cpp)
+target_include_directories(data_logger_node PRIVATE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+)
+ament_target_dependencies(data_logger_node ${THIS_PACKAGE_INCLUDE_DEPENDS})
+
 install(
         DIRECTORY include/
         DESTINATION include/${PROJECT_NAME}
@@ -65,7 +72,7 @@ install(
 )
 
 install(
-        TARGETS ${PROJECT_NAME} dds_ros2_bridge_node
+        TARGETS ${PROJECT_NAME} dds_ros2_bridge_node data_logger_node
         EXPORT export_${PROJECT_NAME}
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
