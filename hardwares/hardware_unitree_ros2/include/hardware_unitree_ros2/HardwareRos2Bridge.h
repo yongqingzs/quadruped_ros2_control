@@ -68,6 +68,7 @@ private:
     void stopDataLogging();
     void recordData(const unitree_go::msg::LowState& low_state, const unitree_go::msg::LowCmd& low_cmd);
     void saveLoggedDataToCsv();
+    void call_visualization_script(const std::string& abs_csv);
 
     // Message converters
     void convertDdsToRos2LowState(const unitree_go::msg::dds_::LowState_& dds_msg, 

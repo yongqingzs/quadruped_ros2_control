@@ -5,6 +5,7 @@
 #include "hardware_unitree_ros2/HardwareRos2Bridge.h"
 #include <unitree/robot/channel/channel_factory.hpp>
 #include <csignal>
+#include <filesystem>
 
 using namespace unitree::robot;
 
@@ -600,11 +601,60 @@ void DdsRos2BridgeNode::saveLoggedDataToCsv()
     }
     
     file.close();
-    
     RCLCPP_INFO(get_logger(), "Saved %zu data points to %s", logged_data_.size(), filename.c_str());
-    
+
+    std::string abs_csv = (std::filesystem::current_path() / filename).string();
+    call_visualization_script(abs_csv);
     // Clear logged data to free memory
     logged_data_.clear();
+}
+
+void DdsRos2BridgeNode::call_visualization_script(const std::string& abs_csv)
+{
+    std::string pkg_dir;
+    {
+        std::array<char, 256> buffer{};
+        std::string cmd = "ros2 pkg prefix hardware_unitree_ros2 2>/dev/null";
+        std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
+        if (pipe) {
+            if (fgets(buffer.data(), buffer.size(), pipe.get())) {
+                pkg_dir = std::string(buffer.data());
+                pkg_dir.erase(pkg_dir.find_last_not_of("\n\r") + 1);
+            }
+        }
+        if (pkg_dir.empty()) {
+            RCLCPP_WARN(get_logger(), "Failed to resolve package directory using ros2 pkg prefix, fallback to current directory");
+            pkg_dir = ".";
+        }
+    }
+    std::string script_path = pkg_dir + "/share/hardware_unitree_ros2/scripts/visualize_logged_data.py";
+
+    std::string home = std::getenv("HOME") ? std::getenv("HOME") : "";
+    std::string venv_dir = home + "/venvs/motor";
+    std::string python_bin = venv_dir + "/bin/python3";
+    std::string activate_script = venv_dir + "/bin/activate";
+
+    bool venv_exists = std::filesystem::exists(python_bin);
+    if (!venv_exists) {
+        std::string mkvenv = "python3 -m venv '" + venv_dir + "'";
+        int ret1 = std::system(mkvenv.c_str());
+        if (ret1 != 0) {
+            RCLCPP_WARN(get_logger(), "Failed to create venv at %s", venv_dir.c_str());
+            return;
+        }
+        std::string pip_install = "'" + python_bin + "' -m pip install --upgrade pip && '" + python_bin + "' -m pip install numpy matplotlib pandas";
+        int ret2 = std::system(pip_install.c_str());
+        if (ret2 != 0) {
+            RCLCPP_WARN(get_logger(), "Failed to install python packages in venv");
+            return;
+        }
+    }
+
+    std::string cmd = "bash -c \"source '" + activate_script + "' && '" + python_bin + "' '" + script_path + "' '" + abs_csv + "' --save\" &";
+    int ret = std::system(cmd.c_str());
+    if (ret != 0) {
+        RCLCPP_WARN(get_logger(), "Failed to call visualize_logged_data.py, return code: %d", ret);
+    }
 }
 
 } // namespace hardware_unitree_ros2
