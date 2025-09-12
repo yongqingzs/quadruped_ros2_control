@@ -581,20 +581,23 @@ void DdsRos2BridgeNode::saveLoggedDataToCsv()
         file << imu.gyroscope[0] << "," << imu.gyroscope[1] << "," << imu.gyroscope[2] << ",";
         file << imu.accelerometer[0] << "," << imu.accelerometer[1] << "," << imu.accelerometer[2] << ",";
         file << imu.rpy[0] << "," << imu.rpy[1] << "," << imu.rpy[2] << ",";
-        file << imu.temperature << ",";
-        
+        file << static_cast<int>(imu.temperature) << ","; // 修正
+
         // Motor states
         for (int i = 0; i < 20; ++i) {
             const auto& motor = data.low_state.motor_state[i];
-            file << motor.mode << "," << motor.q << "," << motor.dq << "," << motor.ddq << ",";
-            file << motor.tau_est << "," << motor.temperature << ",";
+            file << static_cast<int>(motor.mode) << "," // 修正
+                << motor.q << "," << motor.dq << "," << motor.ddq << ","
+                << motor.tau_est << "," 
+                << static_cast<int>(motor.temperature) << ","; // 修正
         }
-        
+
         // Motor commands
         for (int i = 0; i < 20; ++i) {
             const auto& cmd = data.low_cmd.motor_cmd[i];
-            file << cmd.mode << "," << cmd.q << "," << cmd.dq << ",";
-            file << cmd.tau << "," << cmd.kp << "," << cmd.kd << ",";
+            file << static_cast<int>(cmd.mode) << "," // 修正
+                << cmd.q << "," << cmd.dq << ","
+                << cmd.tau << "," << cmd.kp << "," << cmd.kd << ",";
         }
         
         file << "\n";
