@@ -1,0 +1,7 @@
+<library path="hardware_free_dog_sdk">
+  <class name="hardware_free_dog_sdk/HardwareFreeDogSdk" type="HardwareFreeDogSdk" base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ROS2 Control hardware interface for Free Dog SDK robots
+    </description>
+  </class>
+</library>

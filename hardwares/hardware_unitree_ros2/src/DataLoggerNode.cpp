@@ -135,14 +135,14 @@ void DataLoggerNode::controlInputsHandler(const control_input_msgs::msg::Inputs:
     }
 
     // Check if command has changed
-    if (expected_last_command != current_command) {
+    // if (expected_last_command != current_command) {
         last_command_.store(current_command);
 
         RCLCPP_INFO(get_logger(), "Control command changed from %d to %d - starting %d seconds data logging", 
                     expected_last_command, current_command, logging_duration_);
 
         startDataLogging();
-    }
+    // }
 }
 
 void DataLoggerNode::startDataLogging()
@@ -152,10 +152,10 @@ void DataLoggerNode::startDataLogging()
         if (logging_timer_) {
             logging_timer_->cancel();
         }
-    } else {
-        logged_data_.clear();
-        is_logging_ = true;
     }
+    // Always reset for a new logging session to ensure timestamps start from 0
+    logged_data_.clear();
+    is_logging_ = true;
     
     // 使用 node clock 保证时间源一致
     auto node_clock = this->get_clock();
