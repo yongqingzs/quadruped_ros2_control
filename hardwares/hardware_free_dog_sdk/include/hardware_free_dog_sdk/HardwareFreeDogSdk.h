@@ -15,6 +15,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <atomic>
 
 class HardwareFreeDogSdk final : public hardware_interface::SystemInterface {
 public:
@@ -71,13 +72,19 @@ protected:
     double power_limit_ = 0.0;
 
     // Communication thread and synchronization
-    std::thread communication_thread_;
+    std::thread output_thread_;
     std::mutex data_mutex_;
-    std::atomic<bool> running_{false};
+    std::atomic<bool> stop_output_thread_{false};
+
+    // ROS2 Publishers
+    rclcpp::Publisher<unitree_go::msg::LowState>::SharedPtr low_state_publisher_;
+    rclcpp::Publisher<unitree_go::msg::LowCmd>::SharedPtr low_cmd_publisher_;
 
     // Internal methods
     void initLowCmd();
-    void communicationLoop();
+    void outputValues();
+    void publishLowState();
+    void publishLowCmd();
     void updateLowStateData();
     void updateHighStateData();
     void sendLowCmd();
