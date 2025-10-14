@@ -100,3 +100,35 @@ colcon build --packages-select radio_link_input
 - **No data received**: Verify SBUS receiver connection and transmitter binding
 - **Wrong channel values**: Check channel mappings and transmitter configuration
 - **Failsafe active**: Check radio link quality and receiver status
+
+## rc_controller_startup
+
+### 设置 systemd 服务（系统启动时运行脚本）
+创建服务文件 `/etc/systemd/system/rc-controller.service`：
+
+```ini
+[Unit]
+Description=RC Controller Startup Service
+After=network.target
+
+[Service]
+Type=simple
+User=cat  # 替换为你的用户名
+ExecStart=/usr/bin/python3 /home/cat/rc_controller_startup.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- 启用并启动服务：
+  ```bash
+  sudo systemctl daemon-reload
+  sudo systemctl enable rc-controller.service
+  sudo systemctl start rc-controller.service
+  ```
+- 检查状态：`sudo systemctl status rc-controller.service`
+- 查看日志：`journalctl -u rc-controller.service -f`
