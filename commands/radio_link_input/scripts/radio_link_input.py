@@ -10,6 +10,8 @@ import time
 import math
 import subprocess
 import os
+import signal
+import sys
 
 class RadioLinkInput(Node):
     def __init__(self):
@@ -192,10 +194,10 @@ class RadioLinkInput(Node):
         ch4_normal = self.normalize_channel_value(ch4)
         delta = ch4_normal - self.last_ch4_normal
         if delta > 0.5 and ch4_normal > 0.5:
-            self.get_logger().info(f"Starting controller with ch4_normal: {ch4_normal}")
+            self.get_logger().info(f"Starting controller")
             self.start_controller()
         elif delta < -0.5 and ch4_normal < -0.5:
-            self.get_logger().info(f"Stopping controller with ch4_normal: {ch4_normal}")
+            self.get_logger().info(f"Stopping controller")
             self.stop_controller()
         self.last_ch4_normal = ch4_normal
 
@@ -242,6 +244,9 @@ class RadioLinkInput(Node):
         elif delta_1 < -1.0 and self.last_state == self.RobotState['TROT']:
             safe_update(self.RobotState['STAND'])
 
+        if update_state != self.RobotState['RUN']:
+            self.get_logger().info(f"State changed to {update_state}")
+
         return update_state
 
     def start_controller(self):
@@ -276,11 +281,23 @@ class RadioLinkInput(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to stop controller: {e}")
 
+def signal_handler(sig, frame):
+    print('Exiting...')
+    sys.exit(0)
+
 def main(args=None):
+    signal.signal(signal.SIGINT, signal_handler)
     rclpy.init(args=args)
     node = RadioLinkInput()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.running = False  # 停止线程
+        if node.serial_thread and node.serial_thread.is_alive():
+            node.serial_thread.join(timeout=1.0)  # 等待线程退出
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

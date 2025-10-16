@@ -98,6 +98,12 @@ CallbackReturn HardwareFreeDogSdk::on_init(const hardware_interface::HardwareInf
     low_state_publisher_ = node->create_publisher<unitree_go::msg::LowState>("unitree_go/low_state", 10);
     low_cmd_publisher_ = node->create_publisher<unitree_go::msg::LowCmd>("unitree_go/low_cmd", 10);
 
+#ifdef USE_EXTERNAL_IMU
+    // Initialize IMU subscriber
+    imu_subscriber_ = node->create_subscription<sensor_msgs::msg::Imu>(
+        "imu/data", 10, std::bind(&HardwareFreeDogSdk::imuCallback, this, std::placeholders::_1));
+#endif
+
     return CallbackReturn::SUCCESS;
 }
 
@@ -341,6 +347,28 @@ void HardwareFreeDogSdk::convertJointDataToFDSC()
 
 void HardwareFreeDogSdk::convertImuData()
 {
+#ifdef USE_EXTERNAL_IMU
+    // Use external IMU data exclusively when macro is defined
+    std::lock_guard<std::mutex> lock(imu_mutex_);
+    if (latest_imu_msg_)
+    {
+        // Quaternion (w, x, y, z)
+        imu_states_[0] = latest_imu_msg_->orientation.w;
+        imu_states_[1] = latest_imu_msg_->orientation.x;
+        imu_states_[2] = latest_imu_msg_->orientation.y;
+        imu_states_[3] = latest_imu_msg_->orientation.z;
+        
+        // Angular velocity
+        imu_states_[4] = latest_imu_msg_->angular_velocity.x;
+        imu_states_[5] = latest_imu_msg_->angular_velocity.y;
+        imu_states_[6] = latest_imu_msg_->angular_velocity.z;
+        
+        // Linear acceleration
+        imu_states_[7] = latest_imu_msg_->linear_acceleration.x;
+        imu_states_[8] = latest_imu_msg_->linear_acceleration.y;
+        imu_states_[9] = latest_imu_msg_->linear_acceleration.z;
+    }
+#else
     // Convert IMU data from FDSC format to ROS2 Control format
     // Quaternion (w, x, y, z)
     imu_states_[0] = low_state_.imu_quaternion[0];  // w
@@ -357,6 +385,7 @@ void HardwareFreeDogSdk::convertImuData()
     imu_states_[7] = low_state_.imu_accelerometer[0];
     imu_states_[8] = low_state_.imu_accelerometer[1];
     imu_states_[9] = low_state_.imu_accelerometer[2];
+#endif
 }
 
 void HardwareFreeDogSdk::convertFootForceData()
@@ -372,6 +401,12 @@ void HardwareFreeDogSdk::convertFootForceData()
         RCLCPP_INFO(get_logger(), "foot_force: %f, %f, %f, %f", 
                     foot_force_[0], foot_force_[1], foot_force_[2], foot_force_[3]);
     }
+}
+
+void HardwareFreeDogSdk::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(imu_mutex_);
+    latest_imu_msg_ = msg;
 }
 
 void HardwareFreeDogSdk::outputValues()

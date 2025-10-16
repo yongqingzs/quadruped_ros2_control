@@ -12,10 +12,14 @@
 #include <unitree_go/msg/low_state.hpp>
 #include <unitree_go/msg/low_cmd.hpp>
 #include <unitree_go/msg/sport_mode_state.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <memory>
 #include <thread>
 #include <mutex>
 #include <atomic>
+
+// Macro definition for using external IMU
+// #define USE_EXTERNAL_IMU
 
 class HardwareFreeDogSdk final : public hardware_interface::SystemInterface {
 public:
@@ -80,6 +84,11 @@ protected:
     rclcpp::Publisher<unitree_go::msg::LowState>::SharedPtr low_state_publisher_;
     rclcpp::Publisher<unitree_go::msg::LowCmd>::SharedPtr low_cmd_publisher_;
 
+    // External IMU subscriber
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscriber_;
+    sensor_msgs::msg::Imu::SharedPtr latest_imu_msg_;
+    std::mutex imu_mutex_;
+
     // Internal methods
     void initLowCmd();
     void outputValues();
@@ -94,6 +103,9 @@ protected:
     void convertJointDataToFDSC();
     void convertImuData();
     void convertFootForceData();
+
+    // IMU callback
+    void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
 };
 
 #endif //HARDWAREFREEDOGSDK_H

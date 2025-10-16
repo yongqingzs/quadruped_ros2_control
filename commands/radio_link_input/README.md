@@ -104,17 +104,18 @@ colcon build --packages-select radio_link_input
 ## rc_controller_startup
 
 ### 设置 systemd 服务（系统启动时运行脚本）
-创建服务文件 `/etc/systemd/system/rc-controller.service`：
+创建服务文件 `/etc/systemd/system/radio-link-input.service`：
 
 ```ini
 [Unit]
 Description=RC Controller Startup Service
-After=network.target
 
 [Service]
 Type=simple
-User=cat  # 替换为你的用户名
-ExecStart=/usr/bin/python3 /home/cat/rc_controller_startup.py
+User=cat
+Environment=ROS_DOMAIN_ID=19
+Environment=ROS_LOCALHOST_ONLY=0
+ExecStart=/bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/cat/jazzy_ws/install/setup.bash && /usr/bin/python3 /home/cat/Man/autostart/radio_link_input.py"
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -127,8 +128,14 @@ WantedBy=multi-user.target
 - 启用并启动服务：
   ```bash
   sudo systemctl daemon-reload
-  sudo systemctl enable rc-controller.service
-  sudo systemctl start rc-controller.service
+  sudo systemctl enable radio-link-input.service
+  sudo systemctl start radio-link-input.service
   ```
-- 检查状态：`sudo systemctl status rc-controller.service`
-- 查看日志：`journalctl -u rc-controller.service -f`
+- 检查状态：`sudo systemctl status radio-link-input.service`
+- 查看日志：`sudo journalctl -u radio-link-input.service -f`
+
+- 彻底停用服务:
+  ```bash
+  sudo systemctl disable radio-link-input.service
+  sudo systemctl stop radio-link-input.service
+  ```
