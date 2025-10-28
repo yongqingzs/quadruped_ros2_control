@@ -133,3 +133,4 @@ ocs2_quadruped_controller:
       - RR
 
     estimator_type: "gait_based_kalman"
+    enable_gait_adjust: true

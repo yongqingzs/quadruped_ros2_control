@@ -58,7 +58,7 @@ namespace ocs2::legged_robot
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
 
-        verbose_ = true;
+        verbose_ = false;
     }
 
     vector_t GaitBasedKalmanFilter::update(const rclcpp::Time& time, const rclcpp::Duration& period)

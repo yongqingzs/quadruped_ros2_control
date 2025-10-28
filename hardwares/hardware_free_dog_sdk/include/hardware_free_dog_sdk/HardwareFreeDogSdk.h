@@ -79,15 +79,22 @@ protected:
     std::thread output_thread_;
     std::mutex data_mutex_;
     std::atomic<bool> stop_output_thread_{false};
+    std::atomic<bool> stop_node_spin_thread_{false};
 
     // ROS2 Publishers
     rclcpp::Publisher<unitree_go::msg::LowState>::SharedPtr low_state_publisher_;
     rclcpp::Publisher<unitree_go::msg::LowCmd>::SharedPtr low_cmd_publisher_;
 
+    // ROS2 node for publishers and subscribers
+    rclcpp::Node::SharedPtr node_;
+    std::thread node_spin_thread_;
+
+// #ifdef USE_EXTERNAL_IMU
     // External IMU subscriber
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscriber_;
     sensor_msgs::msg::Imu::SharedPtr latest_imu_msg_;
     std::mutex imu_mutex_;
+// #endif
 
     // Internal methods
     void initLowCmd();

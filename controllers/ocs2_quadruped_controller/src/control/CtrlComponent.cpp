@@ -30,11 +30,13 @@ namespace ocs2::legged_robot
         node_->declare_parameter("robot_pkg", robot_pkg_);
         node_->declare_parameter("feet", feet_names_);
         node_->declare_parameter("enable_perceptive", enable_perceptive_);
+        node_->declare_parameter("enable_gait_adjust", enable_gait_adjust_);
 
         robot_pkg_ = node_->get_parameter("robot_pkg").as_string();
         joint_names_ = node_->get_parameter("joints").as_string_array();
         feet_names_ = node_->get_parameter("feet").as_string_array();
         enable_perceptive_ = node_->get_parameter("enable_perceptive").as_bool();
+        enable_gait_adjust_ = node_->get_parameter("enable_gait_adjust").as_bool();
 
 
         const std::string package_share_directory = ament_index_cpp::get_package_share_directory(robot_pkg_);
@@ -197,7 +199,8 @@ namespace ocs2::legged_robot
         const auto gait_manager_ptr = std::make_shared<GaitManager>(
             ctrl_interfaces_,
             legged_interface_->getSwitchedModelReferenceManagerPtr()->
-                               getGaitSchedule());
+                               getGaitSchedule(),
+            enable_gait_adjust_);
         gait_manager_ptr->init(gait_file_);
         mpc_->getSolverPtr()->addSynchronizedModule(gait_manager_ptr);
         mpc_->getSolverPtr()->setReferenceManager(legged_interface_->getReferenceManagerPtr());

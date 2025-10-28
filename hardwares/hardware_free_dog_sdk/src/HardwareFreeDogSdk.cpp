@@ -93,14 +93,14 @@ CallbackReturn HardwareFreeDogSdk::on_init(const hardware_interface::HardwareInf
         return CallbackReturn::ERROR;
     }
 
-    // Initialize ROS2 publishers
-    auto node = rclcpp::Node::make_shared("hardware_free_dog_sdk_node");
-    low_state_publisher_ = node->create_publisher<unitree_go::msg::LowState>("unitree_go/low_state", 10);
-    low_cmd_publisher_ = node->create_publisher<unitree_go::msg::LowCmd>("unitree_go/low_cmd", 10);
+    // Initialize ROS2 node
+    node_ = rclcpp::Node::make_shared("hardware_free_dog_sdk_node");
+    low_state_publisher_ = node_->create_publisher<unitree_go::msg::LowState>("unitree_go/low_state", 10);
+    low_cmd_publisher_ = node_->create_publisher<unitree_go::msg::LowCmd>("unitree_go/low_cmd", 10);
 
 #ifdef USE_EXTERNAL_IMU
     // Initialize IMU subscriber
-    imu_subscriber_ = node->create_subscription<sensor_msgs::msg::Imu>(
+    imu_subscriber_ = node_->create_subscription<sensor_msgs::msg::Imu>(
         "imu/data", 10, std::bind(&HardwareFreeDogSdk::imuCallback, this, std::placeholders::_1));
 #endif
 
@@ -242,6 +242,14 @@ CallbackReturn HardwareFreeDogSdk::on_activate(const rclcpp_lifecycle::State& /*
     // Start output thread
     stop_output_thread_ = false;
     output_thread_ = std::thread(&HardwareFreeDogSdk::outputValues, this);
+
+#ifdef USE_EXTERNAL_IMU
+    // Start ROS2 node spin thread
+    stop_node_spin_thread_ = false;
+    node_spin_thread_ = std::thread([this]() {
+        rclcpp::spin(node_);
+    });
+#endif
     
     return CallbackReturn::SUCCESS;
 }
@@ -255,6 +263,15 @@ CallbackReturn HardwareFreeDogSdk::on_deactivate(const rclcpp_lifecycle::State& 
     if (output_thread_.joinable()) {
         output_thread_.join();
     }
+
+#ifdef USE_EXTERNAL_IMU
+    // Stop ROS2 node spin thread
+    stop_node_spin_thread_ = true;
+    rclcpp::shutdown();
+    if (node_spin_thread_.joinable()) {
+        node_spin_thread_.join();
+    }
+#endif
     
     return CallbackReturn::SUCCESS;
 }

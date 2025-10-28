@@ -53,6 +53,13 @@ namespace ocs2::legged_robot
             cmdGoal[1] = twist.linear.y;
             cmdGoal[2] = 0;
             cmdGoal[3] = twist.angular.z;
+            
+            // for gait
+            ctrl_component_.control_inputs_.ly = twist.linear.x / target_displacement_velocity_;
+            ctrl_component_.control_inputs_.lx = -twist.linear.y / target_displacement_velocity_;
+            ctrl_component_.control_inputs_.ry = 0;
+            ctrl_component_.control_inputs_.rx = -twist.angular.z / target_rotation_velocity_;
+
             twist_count--;
             if (twist_count <= 0)
             {

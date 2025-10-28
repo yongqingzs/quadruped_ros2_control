@@ -32,6 +32,8 @@ void KeyboardInput::timer_callback() {
             reset_count_ = 100;
         }
         publisher_->publish(inputs_);
+        RCLCPP_INFO(get_logger(), "Published command: %d, lx: %.2f, ly: %.2f, rx: %.2f, ry: %.2f",
+                    inputs_.command, inputs_.lx, inputs_.ly, inputs_.rx, inputs_.ry);
         just_published_ = true;
     } else {
         if (just_published_) {
@@ -96,7 +98,7 @@ void KeyboardInput::check_value(char key) {
     switch (key) {
         case 'w':
         case 'W':
-            inputs_.ly = min<float>(inputs_.ly + sensitivity_left_, 1.0);
+            inputs_.ly = min<float>(inputs_.ly + sensitivity_left_, 3.0);
             break;
         case 's':
         case 'S':

@@ -26,7 +26,7 @@ class RadioLinkInput(Node):
         self.declare_parameter('ry_channel', 1)
         self.declare_parameter('mode_0', 9)
         self.declare_parameter('mode_1', 6)
-        self.declare_parameter('mode_2', 4)
+        self.declare_parameter('mode_2', 5)
 
         # Get parameters
         self.serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
@@ -63,12 +63,14 @@ class RadioLinkInput(Node):
             'STOP': 1,
             'STAND': 2,
             'TROT': 3,
+            'FLY': 5
         }
         self.current_state = self.RobotState['STOP']
 
         # State tracking for determineRobotState
         self.last_normal_0 = 0.0
         self.last_normal_1 = 0.0
+        self.last_normal_2 = 0.0
         self.last_state = self.RobotState['STOP']
 
         # Controller management (integrated from rc_controller_startup.py)
@@ -186,6 +188,7 @@ class RadioLinkInput(Node):
         # Update state tracking
         self.last_normal_0 = self.normalize_channel_value(mode_0)
         self.last_normal_1 = self.normalize_channel_value(mode_1)
+        self.last_normal_2 = self.normalize_channel_value(mode_2)
         if self.current_state != self.RobotState['RUN']:
             self.last_state = self.current_state
 
@@ -211,7 +214,18 @@ class RadioLinkInput(Node):
             inputs_msg.ly = self.normalize_channel_value(self.channels[self.channel_mapping['ly_channel']])
             inputs_msg.rx = self.normalize_channel_value(self.channels[self.channel_mapping['rx_channel']])
             inputs_msg.ry = self.normalize_channel_value(self.channels[self.channel_mapping['ry_channel']])
-
+            
+            if self.last_state == self.RobotState['STAND']:
+                inputs_msg.lx *= 0.5
+                inputs_msg.ly *= 0.25
+                inputs_msg.rx *= 0.5
+                inputs_msg.ry *= 0.5
+            elif self.last_state == self.RobotState['TROT']:
+                inputs_msg.ly *= 1.0
+            elif self.last_state == self.RobotState['FLY']:
+                inputs_msg.ly *= 2.0
+            else:
+                pass
         self.inputs_publisher.publish(inputs_msg)
 
     def normalize_channel_value(self, value):
@@ -228,6 +242,7 @@ class RadioLinkInput(Node):
         # Calculate changes
         delta_0 = normal_0 - self.last_normal_0
         delta_1 = normal_1 - self.last_normal_1
+        delta_2 = normal_2 - self.last_normal_2
         update_state = self.RobotState['RUN']
 
         def safe_update(target):
@@ -239,10 +254,16 @@ class RadioLinkInput(Node):
             safe_update(self.RobotState['STAND'])
         elif delta_0 < -0.5:
             safe_update(self.RobotState['STOP'])
-        elif delta_1 > 1.0 and self.last_state == self.RobotState['STAND']:
+        elif delta_1 > 1.0 and self.last_state != self.RobotState['STOP']:
             safe_update(self.RobotState['TROT'])
         elif delta_1 < -1.0 and self.last_state == self.RobotState['TROT']:
             safe_update(self.RobotState['STAND'])
+        elif delta_2 > 1.0 and self.last_state != self.RobotState['STOP']:
+            safe_update(self.RobotState['FLY'])
+        elif delta_2 < -1.0 and self.last_state == self.RobotState['FLY']:
+            safe_update(self.RobotState['STAND'])
+        else:
+            pass
 
         if update_state != self.RobotState['RUN']:
             self.get_logger().info(f"State changed to {update_state}")
@@ -278,6 +299,12 @@ class RadioLinkInput(Node):
                 self.get_logger().info("Rviz processes killed successfully")
             else:
                 self.get_logger().warning(f"Failed to kill rviz processes: {result.stderr}")
+            # Kill any remaining robot_state_publisher processes
+            result = subprocess.run(["pkill", "-f", "robot_state_publisher"], capture_output=True, text=True)
+            if result.returncode == 0:
+                self.get_logger().info("Robot state publisher processes killed successfully")
+            else:
+                self.get_logger().warning(f"Failed to kill robot state publisher processes: {result.stderr}")
         except Exception as e:
             self.get_logger().error(f"Failed to stop controller: {e}")
 

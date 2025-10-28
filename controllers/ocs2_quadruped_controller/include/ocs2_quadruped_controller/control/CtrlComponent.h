@@ -61,7 +61,8 @@ namespace ocs2::legged_robot
         void setupLeggedInterface();
         void setupMpc();
         void setupMrt();
-
+        
+        bool enable_gait_adjust_{false};
         bool enable_perceptive_ = false;
         CtrlInterfaces& ctrl_interfaces_;
         std::unique_ptr<StateEstimateBase> estimator_;

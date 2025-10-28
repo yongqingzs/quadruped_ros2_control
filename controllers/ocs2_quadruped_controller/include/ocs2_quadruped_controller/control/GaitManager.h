@@ -14,7 +14,8 @@ namespace ocs2::legged_robot
     {
     public:
         GaitManager(CtrlInterfaces& ctrl_interfaces,
-                    std::shared_ptr<GaitSchedule> gait_schedule_ptr);
+                    std::shared_ptr<GaitSchedule> gait_schedule_ptr,
+                    bool enable_gait_adjust);
 
         void preSolverRun(scalar_t initTime, scalar_t finalTime,
                           const vector_t& currentState,
@@ -28,6 +29,7 @@ namespace ocs2::legged_robot
 
     private:
         void getTargetGait();
+        void adjustTargetGait();
 
         CtrlInterfaces& ctrl_interfaces_;
         std::shared_ptr<GaitSchedule> gait_schedule_ptr_;
@@ -38,6 +40,13 @@ namespace ocs2::legged_robot
         bool verbose_{false};
         std::vector<ModeSequenceTemplate> gait_list_;
         std::vector<std::string> gait_name_list_;
+
+        bool adjust_active_{true};
+        ModeSequenceTemplate previous_gait_;
+        bool in_stop_mode_{false};
+        int switch_delay_counter_{0};
+        bool pending_switch_to_stop_{false};
+        bool pending_restore_gait_{false};
     };
 }
 
