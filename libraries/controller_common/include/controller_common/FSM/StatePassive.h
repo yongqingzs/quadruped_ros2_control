@@ -5,6 +5,7 @@
 #ifndef STATEPASSIVE_H
 #define STATEPASSIVE_H
 #include "FSMState.h"
+#include <vector>
 
 class StatePassive final : public FSMState
 {
@@ -19,6 +20,13 @@ public:
     void exit() override;
 
     FSMStateName checkChange() override;
+
+private:
+    std::vector<double> init_pose_;
+    std::vector<double> stand_down_pose_;
+    double transition_time_;
+    double running_time_;
+    bool transitioning_;
 };
 
 

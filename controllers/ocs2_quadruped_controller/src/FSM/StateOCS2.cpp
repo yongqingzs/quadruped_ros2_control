@@ -38,6 +38,7 @@ namespace ocs2::legged_robot
 
     void StateOCS2::enter()
     {
+        ctrl_component_->mpc_running_ = false;
         ctrl_component_->init();
     }
 
