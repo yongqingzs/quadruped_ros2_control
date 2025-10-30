@@ -43,6 +43,7 @@ add_library(${PROJECT_NAME} SHARED
         src/estimator/StateEstimateBase.cpp
         src/estimator/FromOdomTopic.cpp
         src/estimator/GaitBasedKalmanFilter.cpp
+        src/estimator/ContactKalmanFilter.cpp
 
         src/wbc/HierarchicalWbc.cpp
         src/wbc/HoQp.cpp

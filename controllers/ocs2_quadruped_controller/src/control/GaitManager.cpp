@@ -93,7 +93,7 @@ namespace ocs2::legged_robot
                 std::cout << "Starting switch to stop gait timer." << std::endl;
             }
             switch_delay_counter_++;
-            std::cout << "switch_delay_counter_: " << switch_delay_counter_ << std::endl;
+            // std::cout << "switch_delay_counter_: " << switch_delay_counter_ << std::endl;
             if (switch_delay_counter_ >= delay_count) 
             {
                 previous_gait_ = target_gait_;  // Remember current gait
