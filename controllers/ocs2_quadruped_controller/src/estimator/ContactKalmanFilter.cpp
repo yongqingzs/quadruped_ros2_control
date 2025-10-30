@@ -61,12 +61,16 @@ namespace ocs2::legged_robot {
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
 
+        // node_->declare_parameter("estimator_type", estimator_type_);
+        estimator_type_ = node_->get_parameter("estimator_type").as_string();
+
         node_->declare_parameter("contact_verbose", verbose_);
         verbose_ = node_->get_parameter("contact_verbose").as_bool();
 
         node_->declare_parameter("est_contact_threshold", est_contact_threshold_);
         est_contact_threshold_ = node_->get_parameter("est_contact_threshold").as_int();
-        
+
+        RCLCPP_INFO(node_->get_logger(), "[ContactKalmanFilter] estimator_type: %s", estimator_type_.c_str());
         RCLCPP_INFO(node_->get_logger(), "[ContactKalmanFilter] contact_verbose: %s", verbose_ ? "true" : "false");
         RCLCPP_INFO(node_->get_logger(), "[ContactKalmanFilter] est_contact_threshold: %d", est_contact_threshold_);
     }
@@ -210,8 +214,22 @@ namespace ocs2::legged_robot {
             est_contact[i] = est_forces[i] > est_contact_threshold_;
 
         // true output
-        for (int i = 0; i < size; i++)
-            contact_flag_[i] = est_contact[i];
+        if (estimator_type_ == "gait_based_kalman")
+        {
+            for (int i = 0; i < size; i++)
+                contact_flag_[i] = gait_contact[i];
+        }
+        else if (estimator_type_ == "contact_kalman")
+        {
+            for (int i = 0; i < size; i++)
+                contact_flag_[i] = est_contact[i];
+        }
+        else
+        {
+            for (int i = 0; i < size; i++)
+                contact_flag_[i] = gait_contact[i];
+        }
+
 
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastPrintTime);

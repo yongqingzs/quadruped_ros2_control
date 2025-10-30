@@ -59,6 +59,9 @@ namespace ocs2::legged_robot {
         scalar_t footSensorNoiseVelocity_ = 0.1;
         scalar_t footHeightSensorNoise_ = 0.01;
 
+        // External
+        std::string estimator_type_ = "gait_based_kalman";
+
     private:
         size_t numContacts_, dimContacts_, numState_, numObserve_;
 
