@@ -61,7 +61,14 @@ namespace ocs2::legged_robot {
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
 
-        verbose_ = false;
+        node_->declare_parameter("contact_verbose", verbose_);
+        verbose_ = node_->get_parameter("contact_verbose").as_bool();
+
+        node_->declare_parameter("est_contact_threshold", est_contact_threshold_);
+        est_contact_threshold_ = node_->get_parameter("est_contact_threshold").as_int();
+        
+        RCLCPP_INFO(node_->get_logger(), "[ContactKalmanFilter] contact_verbose: %s", verbose_ ? "true" : "false");
+        RCLCPP_INFO(node_->get_logger(), "[ContactKalmanFilter] est_contact_threshold: %d", est_contact_threshold_);
     }
 
     void ContactKalmanFilterEstimate::updateJointStates()
@@ -184,12 +191,6 @@ namespace ocs2::legged_robot {
             est_forces[i] = r;
         }
 
-        // std::cout << "estForces: ";
-        // for (int i = 0; i < 4; i++) {
-        //     std::cout << estForces[i] << " ";
-        // }
-        // std::cout << std::endl;
-
         // foot_force
         const size_t size = ctrl_component_.foot_force_state_interface_.size();
         contact_flag_t feet_contact{};
@@ -210,18 +211,8 @@ namespace ocs2::legged_robot {
 
         // true output
         for (int i = 0; i < size; i++)
-            contact_flag_[i] = est_contact[i];  // 
+            contact_flag_[i] = est_contact[i];
 
-        // std::cout << "contact_flag_: ";
-        // for (int i = 0; i < size; i++)
-        //     std::cout << feet_contact[i] << " ";
-        // std::cout << std::endl;
-        // std::cout << "est_contact: ";
-        // for (int i = 0; i < size; i++)
-        //     std::cout << est_contact[i] << " ";
-        // std::cout << std::endl;
-
-        // 检查是否已经过了 3 秒
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastPrintTime);
 
@@ -234,6 +225,11 @@ namespace ocs2::legged_robot {
 
             std::cout << "esti contact: ";
             printContactFlags(est_contact);
+            
+            std::cout << "est_forces: ";
+            for (int i = 0; i < 4; i++)
+                std::cout << est_forces[i] << " ";
+            std::cout << std::endl;
 
             lastPrintTime = now; // 更新上次打印时间
         }

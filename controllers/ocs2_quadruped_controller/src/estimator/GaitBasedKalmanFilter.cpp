@@ -58,7 +58,9 @@ namespace ocs2::legged_robot
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
 
-        verbose_ = false;
+        node_->declare_parameter("contact_verbose", verbose_);
+        verbose_ = node_->get_parameter("contact_verbose").as_bool();
+        RCLCPP_INFO(node_->get_logger(), "[GaitBasedKalmanFilter] contact_verbose: %s", verbose_ ? "true" : "false");
     }
 
     vector_t GaitBasedKalmanFilter::update(const rclcpp::Time& time, const rclcpp::Duration& period)
