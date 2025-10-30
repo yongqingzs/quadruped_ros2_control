@@ -109,7 +109,7 @@ namespace ocs2::legged_robot
                 legged_interface_->getPinocchioInterface(),
                 legged_interface_->getCentroidalModelInfo(),
                 *ee_kinematics_, ctrl_interfaces_,
-                node_);
+                node_, legged_interface_->getSwitchedModelReferenceManagerPtr(), observation_.time);
             dynamic_cast<ContactKalmanFilterEstimate&>(*estimator_).loadSettings(task_file_, verbose_);
             RCLCPP_INFO(node_->get_logger(), "Using Contact Kalman Filter Estimator");
         }

@@ -20,15 +20,19 @@ namespace ocs2::legged_robot {
                                                CentroidalModelInfo info,
                                                const PinocchioEndEffectorKinematics &ee_kinematics,
                                                CtrlInterfaces &ctrl_component,
-                                               const rclcpp_lifecycle::LifecycleNode::SharedPtr &node)
-        : StateEstimateBase(std::move(info), ctrl_component,
-                            node),
+                                               const rclcpp_lifecycle::LifecycleNode::SharedPtr &node,
+                                               const std::shared_ptr<SwitchedModelReferenceManager>& referenceManagerPtr,
+                                               const scalar_t& obs_time)
+        : StateEstimateBase(std::move(info), ctrl_component, node),
           pinocchio_interface_(std::move(pinocchio_interface)),
           ee_kinematics_(ee_kinematics.clone()),
+          referenceManagerPtr_(referenceManagerPtr),
           numContacts_(info_.numThreeDofContacts + info_.numSixDofContacts),
           dimContacts_(3 * numContacts_),
           numState_(6 + dimContacts_),
-          numObserve_(2 * dimContacts_ + numContacts_) {
+          numObserve_(2 * dimContacts_ + numContacts_),
+          obs_time_(obs_time) 
+    {
         xHat_.setZero(numState_);
         ps_.setZero(dimContacts_);
         vs_.setZero(dimContacts_);
@@ -56,6 +60,8 @@ namespace ocs2::legged_robot {
 
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
+
+        verbose_ = false;
     }
 
     void ContactKalmanFilterEstimate::updateJointStates()
@@ -154,6 +160,20 @@ namespace ocs2::legged_robot {
 
     void ContactKalmanFilterEstimate::updateEstContact(const rclcpp::Duration &period)
     {
+        static auto lastPrintTime = std::chrono::steady_clock::now(); // 记录上次打印时间
+
+        // Get contact flag from gait
+        auto printContactFlags = [](const contact_flag_t& contactFlags) {
+            std::cout << "Contact Flags: [";
+            for (size_t i = 0; i < contactFlags.size(); ++i) {
+                std::cout << (contactFlags[i] ? "true" : "false");
+                if (i < contactFlags.size() - 1) {
+                    std::cout << ", ";
+                }
+            }
+            std::cout << "]" << std::endl;
+        };
+
         vector_t est_contact_forces = estContactForce(period);
         vector_t est_forces = vector_t::Zero(4);
 
@@ -170,6 +190,7 @@ namespace ocs2::legged_robot {
         // }
         // std::cout << std::endl;
 
+        // foot_force
         const size_t size = ctrl_component_.foot_force_state_interface_.size();
         contact_flag_t feet_contact{};
         for (int i = 0; i < size; i++)
@@ -178,27 +199,44 @@ namespace ocs2::legged_robot {
                 feet_force_threshold_;
         }
 
+        // gait
+        contact_flag_t gait_contact{};
+        gait_contact = referenceManagerPtr_->getContactFlags(obs_time_);
+
+        // tau est
         contact_flag_t est_contact{};
         for (int i = 0; i < size; i++)
-        {
             est_contact[i] = est_forces[i] > est_contact_threshold_;
-        }
 
+        // true output
         for (int i = 0; i < size; i++)
-        {
-            contact_flag_[i] = est_contact[i];
-        }
+            contact_flag_[i] = est_contact[i];  // 
 
-        std::cout << "contact_flag_: ";
-        for (int i = 0; i < 4; i++) {
-            std::cout << feet_contact[i] << " ";
+        // std::cout << "contact_flag_: ";
+        // for (int i = 0; i < size; i++)
+        //     std::cout << feet_contact[i] << " ";
+        // std::cout << std::endl;
+        // std::cout << "est_contact: ";
+        // for (int i = 0; i < size; i++)
+        //     std::cout << est_contact[i] << " ";
+        // std::cout << std::endl;
+
+        // 检查是否已经过了 3 秒
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastPrintTime);
+
+        if (elapsed.count() >= 1 && verbose_) {
+            std::cout << "feet contact: ";
+            printContactFlags(feet_contact);
+
+            std::cout << "gait contact: ";
+            printContactFlags(gait_contact);
+
+            std::cout << "esti contact: ";
+            printContactFlags(est_contact);
+
+            lastPrintTime = now; // 更新上次打印时间
         }
-        std::cout << std::endl;
-        std::cout << "est_contact: ";
-        for (int i = 0; i < 4; i++) {
-            std::cout << est_contact[i] << " ";
-        }
-        std::cout << std::endl;
     }
 
     vector_t ContactKalmanFilterEstimate::update(const rclcpp::Time &time, const rclcpp::Duration &period) {
