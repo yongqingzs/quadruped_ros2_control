@@ -61,6 +61,10 @@ namespace ocs2::legged_robot {
         ee_kinematics_->setPinocchioInterface(pinocchio_interface_);
         initPublishers();
 
+        // Create contact info publisher
+        contact_info_publisher_ = node_->create_publisher<control_input_msgs::msg::ContactInfo>(
+            "/contact_info", 10);
+
         // node_->declare_parameter("estimator_type", estimator_type_);
         estimator_type_ = node_->get_parameter("estimator_type").as_string();
 
@@ -187,8 +191,10 @@ namespace ocs2::legged_robot {
 
         vector_t est_contact_forces = estContactForce(period);
         vector_t est_forces = vector_t::Zero(4);
+        vector_t est_forces_z = vector_t::Zero(4);
 
         for (int i = 0; i < 4; i++) {
+            est_forces_z[i] = est_contact_forces[2 + 3 * i];
             double r = std::sqrt(est_contact_forces[0 + 3 * i] * est_contact_forces[0 + 3 * i] + 
                                 est_contact_forces[1 + 3 * i] * est_contact_forces[1 + 3 * i] + 
                                 est_contact_forces[2 + 3 * i] * est_contact_forces[2 + 3 * i]);
@@ -212,6 +218,26 @@ namespace ocs2::legged_robot {
         contact_flag_t est_contact{};
         for (int i = 0; i < size; i++)
             est_contact[i] = est_forces[i] > est_contact_threshold_;
+
+        // Publish contact info message
+        control_input_msgs::msg::ContactInfo contact_msg;
+        contact_msg.header.stamp = node_->now();
+        contact_msg.header.frame_id = "base";
+        
+        // Copy estimated contact forces (12 values)
+        for (int i = 0; i < 12; i++)
+            contact_msg.est_contact_forces[i] = est_contact_forces[i];
+        
+        // Copy contact flags (4 values each)
+        for (int i = 0; i < 4; i++) {
+            contact_msg.feet_contact[i] = feet_contact[i];
+            contact_msg.gait_contact[i] = gait_contact[i];
+            contact_msg.est_contact[i] = est_contact[i];
+            contact_msg.est_force_magnitude[i] = est_forces[i];
+            contact_msg.est_force_z[i] = est_forces_z[i];
+        }
+        
+        contact_info_publisher_->publish(contact_msg);
 
         // true output
         if (estimator_type_ == "gait_based_kalman")
@@ -247,6 +273,11 @@ namespace ocs2::legged_robot {
             std::cout << "est_forces: ";
             for (int i = 0; i < 4; i++)
                 std::cout << est_forces[i] << " ";
+            std::cout << std::endl;
+
+            std::cout << "est_forces_z: ";
+            for (int i = 0; i < 4; i++)
+                std::cout << est_forces_z[i] << " ";
             std::cout << std::endl;
 
             lastPrintTime = now; // 更新上次打印时间

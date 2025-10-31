@@ -11,6 +11,7 @@
 #include <ocs2_quadruped_controller/interface/SwitchedModelReferenceManager.h>
 
 #include <tf2_ros/transform_broadcaster.h>
+#include <control_input_msgs/msg/contact_info.hpp>
 
 namespace ocs2::legged_robot {
     class ContactKalmanFilterEstimate final : public StateEstimateBase {
@@ -49,6 +50,9 @@ namespace ocs2::legged_robot {
         vector_t pSCgZinvlast_;
         int est_contact_threshold_ = 40;
         int iter_ = 0;
+
+        // Contact info publisher
+        rclcpp::Publisher<control_input_msgs::msg::ContactInfo>::SharedPtr contact_info_publisher_;
 
         // Config
         scalar_t foot_radius_ = 0.02;
