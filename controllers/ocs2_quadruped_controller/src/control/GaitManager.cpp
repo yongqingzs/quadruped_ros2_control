@@ -65,7 +65,7 @@ namespace ocs2::legged_robot
 
     void GaitManager::adjustTargetGait()
     {
-        const int delay_count = 200;
+        const int delay_count = 100;
         int last_cmd = std::max(0, last_command_ - 2);
 
         // Check if robot should be moving

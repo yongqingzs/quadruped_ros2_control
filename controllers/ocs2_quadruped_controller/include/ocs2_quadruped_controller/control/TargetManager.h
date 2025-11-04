@@ -22,7 +22,8 @@ namespace ocs2::legged_robot
                       rclcpp_lifecycle::LifecycleNode::SharedPtr  node,
                       const std::shared_ptr<ReferenceManagerInterface>& referenceManagerPtr,
                       const std::string& task_file,
-                      const std::string& reference_file);
+                      const std::string& reference_file,
+                      const bool& stop_mode);
 
         ~TargetManager() = default;
 
@@ -58,6 +59,7 @@ namespace ocs2::legged_robot
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
         realtime_tools::RealtimeBuffer<geometry_msgs::msg::Twist> buffer_;
         int twist_count = 0;
+        const bool& stop_mode_;
 
         vector_t default_joint_state_{};
         scalar_t command_height_{};

@@ -15,10 +15,12 @@ namespace ocs2::legged_robot
                                  rclcpp_lifecycle::LifecycleNode::SharedPtr node,
                                  const std::shared_ptr<ReferenceManagerInterface>& referenceManagerPtr,
                                  const std::string& task_file,
-                                 const std::string& reference_file)
+                                 const std::string& reference_file,
+                                 const bool& stop_mode)
         : ctrl_component_(ctrl_component),
           referenceManagerPtr_(referenceManagerPtr),
-          node_(std::move(node))
+          node_(std::move(node)),
+          stop_mode_(stop_mode)
     {
         default_joint_state_ = vector_t::Zero(12);
         loadData::loadCppDataType(reference_file, "comHeight", command_height_);
@@ -66,6 +68,8 @@ namespace ocs2::legged_robot
                 buffer_.reset();
             }
         }
+
+        if (stop_mode_) cmdGoal.setZero();
 
         const vector_t currentPose = observation.state.segment<6>(6);
         const Eigen::Matrix<scalar_t, 3, 1> zyx = currentPose.tail(3);

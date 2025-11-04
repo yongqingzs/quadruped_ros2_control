@@ -134,5 +134,5 @@ ocs2_quadruped_controller:
 
     estimator_type: "gait_based_kalman"  # gait_based_kalman, contact_kalman, linear_kalman
     contact_verbose: false
-    est_contact_threshold: 40
+    est_contact_threshold: 20
     enable_gait_adjust: false

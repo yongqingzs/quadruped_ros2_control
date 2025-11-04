@@ -27,6 +27,8 @@ namespace ocs2::legged_robot
 
         void init(const std::string& gait_file);
 
+        bool in_stop_mode_{false};
+
     private:
         void getTargetGait();
         void adjustTargetGait();
@@ -43,7 +45,6 @@ namespace ocs2::legged_robot
 
         bool adjust_active_{true};
         ModeSequenceTemplate previous_gait_;
-        bool in_stop_mode_{false};
         int switch_delay_counter_{0};
         bool pending_switch_to_stop_{false};
         bool pending_restore_gait_{false};

@@ -210,7 +210,8 @@ namespace ocs2::legged_robot
                                                           node_,
                                                           legged_interface_->getReferenceManagerPtr(),
                                                           task_file_,
-                                                          reference_file_);
+                                                          reference_file_,
+                                                          gait_manager_ptr->in_stop_mode_);
 
         if (enable_perceptive_)
         {

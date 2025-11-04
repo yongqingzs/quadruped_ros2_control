@@ -176,6 +176,8 @@ namespace ocs2::legged_robot {
     void ContactKalmanFilterEstimate::updateEstContact(const rclcpp::Duration &period)
     {
         static auto lastPrintTime = std::chrono::steady_clock::now(); // 记录上次打印时间
+        scalar_t dt = period.seconds();
+        const scalar_t obs_delay_time = 0; // dt * 5: 5 step delay
 
         // Get contact flag from gait
         auto printContactFlags = [](const contact_flag_t& contactFlags) {
@@ -212,12 +214,12 @@ namespace ocs2::legged_robot {
 
         // gait
         contact_flag_t gait_contact{};
-        gait_contact = referenceManagerPtr_->getContactFlags(obs_time_);
+        gait_contact = referenceManagerPtr_->getContactFlags(obs_time_ + obs_delay_time);
 
         // tau est
         contact_flag_t est_contact{};
         for (int i = 0; i < size; i++)
-            est_contact[i] = est_forces[i] > est_contact_threshold_;
+            est_contact[i] = est_forces_z[i] > est_contact_threshold_;
 
         // Publish contact info message
         control_input_msgs::msg::ContactInfo contact_msg;
