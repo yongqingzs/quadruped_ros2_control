@@ -77,11 +77,22 @@ class RadioLinkInput(Node):
         self.controller_process = None
         self.controller_running = False
         self.last_ch4_normal = 1.0
+        
+        # Controller types
+        self.ControllerType = {
+            'NONE': 0,
+            'STOP': 1,
+            'MPC': 2,
+            'RL_SAR': 3
+        }
+        self.current_controller_type = self.ControllerType['NONE']
 
         # ROS2 environment settings
         self.ROS_SETUP = '/opt/ros/jazzy/setup.bash'
         self.WORKSPACE_SETUP = '/home/cat/jazzy_ws/install/setup.bash'
+        self.RL_SAR_SETUP = '/home/cat/rl_sar/install/setup.bash'
         self.LAUNCH_FILE = '/home/cat/jazzy_ws/src/quadruped_ros2_control/controllers/ocs2_quadruped_controller/launch/mujoco.launch.py'
+        self.RL_SAR_COMMAND = 'ros2 run rl_sar rl_real_go1'
 
         # Setup serial
         if self.setup_serial():
@@ -192,16 +203,48 @@ class RadioLinkInput(Node):
         if self.current_state != self.RobotState['RUN']:
             self.last_state = self.current_state
 
-        # Controller management based on channel 4 (integrated from rc_controller_startup.py)
+        # Controller management based on channel 4
         ch4 = self.channels[4]
         ch4_normal = self.normalize_channel_value(ch4)
         delta = ch4_normal - self.last_ch4_normal
+        # Determine desired controller type
+        desired_controller_type = self.ControllerType['NONE']
         if delta > 0.5 and ch4_normal > 0.5:
-            self.get_logger().info(f"Starting controller")
-            self.start_controller()
+            desired_controller_type = self.ControllerType['MPC']
         elif delta < -0.5 and ch4_normal < -0.5:
-            self.get_logger().info(f"Stopping controller")
-            self.stop_controller()
+            desired_controller_type = self.ControllerType['RL_SAR']
+        elif abs(ch4_normal) < 0.2:
+            # else: stays NONE (middle position = stop)
+            desired_controller_type = self.ControllerType['STOP']
+        
+        # Controller switching logic with safety check
+        if desired_controller_type != self.current_controller_type:
+            if desired_controller_type == self.ControllerType['NONE']:
+                pass
+            elif desired_controller_type == self.ControllerType['STOP']:
+                # Stop any running controller
+                # if self.controller_running:
+                self.get_logger().info("Stopping controller (middle position)")
+                self.stop_controller()
+            elif desired_controller_type == self.ControllerType['MPC']:
+                # Start MPC controller (only if not currently running RL_SAR)
+                if not self.controller_running or self.current_controller_type != self.ControllerType['RL_SAR']:
+                    # if self.controller_running:
+                    self.stop_controller()  # Stop current controller first
+                    self.get_logger().info("Starting MPC controller")
+                    self.start_controller(self.ControllerType['MPC'])
+                else:
+                    self.get_logger().warn("Cannot switch directly from RL_SAR to MPC. Stop controller first.")
+            elif desired_controller_type == self.ControllerType['RL_SAR']:
+                # Start RL_SAR controller (only if not currently running MPC)
+                if not self.controller_running or self.current_controller_type != self.ControllerType['MPC']:
+                    # if self.controller_running:
+                    self.stop_controller()  # Stop current controller first
+                    self.get_logger().info("Starting RL_SAR controller")
+                    self.start_controller(self.ControllerType['RL_SAR'])
+                else:
+                    self.get_logger().warn("Cannot switch directly from MPC to RL_SAR. Stop controller first.")
+        
         self.last_ch4_normal = ch4_normal
 
     def publish_inputs_message(self):
@@ -270,28 +313,56 @@ class RadioLinkInput(Node):
 
         return update_state
 
-    def start_controller(self):
+    def start_controller(self, controller_type):
         if self.controller_running:
             self.get_logger().info("Controller already running")
             return
+        
         try:
-            # Source ROS2 environment and launch
-            cmd = f"source {self.ROS_SETUP} && source {self.WORKSPACE_SETUP} && ros2 launch {self.LAUNCH_FILE}"
-            self.controller_process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+            if controller_type == self.ControllerType['MPC']:
+                # Source ROS2 environment and launch MPC controller
+                cmd = f"source {self.ROS_SETUP} && source {self.WORKSPACE_SETUP} && ros2 launch {self.LAUNCH_FILE}"
+                self.controller_process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                self.current_controller_type = self.ControllerType['MPC']
+                self.get_logger().info("MPC Controller started")
+            elif controller_type == self.ControllerType['RL_SAR']:
+                # Source ROS2 environment and run RL_SAR controller
+                cmd = f"source {self.ROS_SETUP} && source {self.WORKSPACE_SETUP} && source {self.RL_SAR_SETUP} && {self.RL_SAR_COMMAND}"
+                self.controller_process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                self.current_controller_type = self.ControllerType['RL_SAR']
+                self.get_logger().info("RL_SAR Controller started")
+            else:
+                self.get_logger().error(f"Unknown controller type: {controller_type}")
+                return
+                
             self.controller_running = True
-            self.get_logger().info("Controller started")
         except Exception as e:
             self.get_logger().error(f"Failed to start controller: {e}")
+            self.current_controller_type = self.ControllerType['NONE']
 
     def stop_controller(self):
-        if not self.controller_running:
-            self.get_logger().info("Controller not running")
-            return
+        # if not self.controller_running:
+        #     self.get_logger().info("Controller not running")
+        #     return
         try:
             if self.controller_process:
                 self.controller_process.terminate()
                 self.controller_process.wait(timeout=10)
+            
+            # 额外 kill
+            result = subprocess.run(["pkill", "-f", "rl_real_go1"], capture_output=True, text=True)
+            if result.returncode == 0:
+                self.get_logger().info("rl_real_go1 processes killed successfully")
+            else:
+                self.get_logger().warning(f"Failed to kill rl_real_go1 processes: {result.stderr}")
+            result = subprocess.run(["pkill", "-f", "ros2_control_node"], capture_output=True, text=True)
+            if result.returncode == 0:
+                self.get_logger().info("ros2_control_node processes killed successfully")
+            else:
+                self.get_logger().warning(f"Failed to kill ros2_control_node processes: {result.stderr}")
+
             self.controller_running = False
+            self.current_controller_type = self.ControllerType['STOP']
             self.get_logger().info("Controller stopped")
             # Kill any remaining rviz processes
             result = subprocess.run(["pkill", "-f", "rviz"], capture_output=True, text=True)
