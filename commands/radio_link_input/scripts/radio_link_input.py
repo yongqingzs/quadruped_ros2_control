@@ -27,6 +27,7 @@ class RadioLinkInput(Node):
         self.declare_parameter('mode_0', 9)
         self.declare_parameter('mode_1', 6)
         self.declare_parameter('mode_2', 5)
+        self.declare_parameter('mode_3', 7)
 
         # Get parameters
         self.serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
@@ -39,6 +40,7 @@ class RadioLinkInput(Node):
             'mode_0': self.get_parameter('mode_0').get_parameter_value().integer_value,
             'mode_1': self.get_parameter('mode_1').get_parameter_value().integer_value,
             'mode_2': self.get_parameter('mode_2').get_parameter_value().integer_value,
+            'mode_3': self.get_parameter('mode_3').get_parameter_value().integer_value,
         }
 
         # Create publisher
@@ -63,7 +65,8 @@ class RadioLinkInput(Node):
             'STOP': 1,
             'STAND': 2,
             'TROT': 3,
-            'FLY': 5
+            'FLY': 4,
+            'PARK': 5,
         }
         self.current_state = self.RobotState['STOP']
 
@@ -71,6 +74,7 @@ class RadioLinkInput(Node):
         self.last_normal_0 = 0.0
         self.last_normal_1 = 0.0
         self.last_normal_2 = 0.0
+        self.last_normal_3 = 0.0
         self.last_state = self.RobotState['STOP']
 
         # Controller management (integrated from rc_controller_startup.py)
@@ -194,12 +198,14 @@ class RadioLinkInput(Node):
         mode_0 = self.channels[self.channel_mapping['mode_0']]
         mode_1 = self.channels[self.channel_mapping['mode_1']]
         mode_2 = self.channels[self.channel_mapping['mode_2']]
-        self.current_state = self.determine_robot_state(mode_0, mode_1, mode_2)
+        mode_3 = self.channels[self.channel_mapping['mode_3']]
+        self.current_state = self.determine_robot_state(mode_0, mode_1, mode_2, mode_3)
 
         # Update state tracking
         self.last_normal_0 = self.normalize_channel_value(mode_0)
         self.last_normal_1 = self.normalize_channel_value(mode_1)
         self.last_normal_2 = self.normalize_channel_value(mode_2)
+        self.last_normal_3 = self.normalize_channel_value(mode_3)
         if self.current_state != self.RobotState['RUN']:
             self.last_state = self.current_state
 
@@ -250,6 +256,9 @@ class RadioLinkInput(Node):
     def publish_inputs_message(self):
         inputs_msg = Inputs()
         inputs_msg.command = self.current_state
+        if self.current_controller_type == self.ControllerType['MPC']:
+            if self.current_state == self.RobotState["FLY"]:
+                inputs_msg.command = 5
 
         # Map channels to control inputs
         if inputs_msg.command == 0:
@@ -265,8 +274,17 @@ class RadioLinkInput(Node):
                 inputs_msg.ry *= 0.5
             elif self.last_state == self.RobotState['TROT']:
                 inputs_msg.ly *= 1.0
+                if self.current_controller_type == self.ControllerType['RL_SAR']:
+                    inputs_msg.ly *= 1.5 if inputs_msg.ly > 0 else 0.5
             elif self.last_state == self.RobotState['FLY']:
-                inputs_msg.ly *= 2.0
+                tmp_ly = inputs_msg.ly
+                inputs_msg.ly = tmp_ly * 2.0
+                if self.current_controller_type == self.ControllerType['RL_SAR']:
+                    inputs_msg.ly = tmp_ly * 1 if tmp_ly > 0 else tmp_ly * 0.5
+            elif self.last_state == self.RobotState['PARK']:
+                tmp_ly = inputs_msg.ly
+                if self.current_controller_type == self.ControllerType['RL_SAR']:
+                    inputs_msg.ly = tmp_ly * 1 if tmp_ly > 0 else tmp_ly * 0.5
             else:
                 pass
         self.inputs_publisher.publish(inputs_msg)
@@ -277,15 +295,17 @@ class RadioLinkInput(Node):
             clamped = 0.0  # Deadzone
         return clamped
 
-    def determine_robot_state(self, mode_0, mode_1, mode_2):
+    def determine_robot_state(self, mode_0, mode_1, mode_2, mode_3):
         normal_0 = self.normalize_channel_value(mode_0)
         normal_1 = self.normalize_channel_value(mode_1)
         normal_2 = self.normalize_channel_value(mode_2)
+        normal_3 = self.normalize_channel_value(mode_3)
 
         # Calculate changes
         delta_0 = normal_0 - self.last_normal_0
         delta_1 = normal_1 - self.last_normal_1
         delta_2 = normal_2 - self.last_normal_2
+        delta_3 = normal_3 - self.last_normal_3
         update_state = self.RobotState['RUN']
 
         def safe_update(target):
@@ -299,11 +319,13 @@ class RadioLinkInput(Node):
             safe_update(self.RobotState['STOP'])
         elif delta_1 > 1.0 and self.last_state != self.RobotState['STOP']:
             safe_update(self.RobotState['TROT'])
-        elif delta_1 < -1.0 and self.last_state == self.RobotState['TROT']:
+        elif delta_1 < -1.0:
             safe_update(self.RobotState['STAND'])
-        elif delta_2 > 1.0 and self.last_state != self.RobotState['STOP']:
+        elif normal_3 < -0.5 and delta_3 < -0.5 and self.last_state != self.RobotState['STOP']:
             safe_update(self.RobotState['FLY'])
-        elif delta_2 < -1.0 and self.last_state == self.RobotState['FLY']:
+        elif normal_3 > 0.5 and delta_3 > 0.5 and self.last_state != self.RobotState['STOP']:
+            safe_update(self.RobotState['PARK'])
+        elif abs(normal_3) < 0.1 and abs(delta_3) > 0.5:
             safe_update(self.RobotState['STAND'])
         else:
             pass
