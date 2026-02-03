@@ -15,6 +15,7 @@
 #include <ocs2_legged_robot_ros/visualization/LeggedRobotVisualizer.h>
 #include <ocs2_quadruped_controller/perceptive/visualize/FootPlacementVisualization.h>
 #include <ocs2_quadruped_controller/perceptive/visualize/SphereVisualization.h>
+#include <control_input_msgs/msg/amp_motion_data.hpp>
 
 #include "TargetManager.h"
 
@@ -38,6 +39,8 @@ namespace ocs2::legged_robot
         void setupStateEstimate(const std::string& estimator_type);
         void updateState(const rclcpp::Time& time, const rclcpp::Duration& period);
         void init();
+        
+        void enableAMPDataPublisher(bool enable, double publish_rate = 50.0);
 
         std::shared_ptr<rclcpp_lifecycle::LifecycleNode> node_;
         std::unique_ptr<LeggedInterface> legged_interface_;
@@ -71,6 +74,12 @@ namespace ocs2::legged_robot
 
         std::unique_ptr<FootPlacementVisualization> footPlacementVisualizationPtr_;
         std::unique_ptr<SphereVisualization> sphereVisualizationPtr_;
+        
+        // AMP Data Publisher (optional)
+        bool enable_amp_publisher_{false};
+        rclcpp::Publisher<control_input_msgs::msg::AMPMotionData>::SharedPtr amp_data_pub_;
+        rclcpp::TimerBase::SharedPtr amp_publish_timer_;
+        void publishAMPData();
 
         std::vector<std::string> joint_names_;
         std::vector<std::string> feet_names_;

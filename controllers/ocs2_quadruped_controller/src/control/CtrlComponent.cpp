@@ -259,4 +259,134 @@ namespace ocs2::legged_robot
         setThreadPriority(legged_interface_->sqpSettings().threadPriority, mpc_thread_);
         RCLCPP_INFO(node_->get_logger(), "MRT initialized. MPC thread started.");
     }
+    
+    void CtrlComponent::enableAMPDataPublisher(bool enable, double publish_rate)
+    {
+        if (enable && !enable_amp_publisher_)
+        {
+            enable_amp_publisher_ = true;
+            
+            // Create publisher
+            amp_data_pub_ = node_->create_publisher<control_input_msgs::msg::AMPMotionData>(
+                "/amp_motion_data", 10);
+            
+            // Create timer for publishing at specified rate
+            auto period = std::chrono::duration<double>(1.0 / publish_rate);
+            amp_publish_timer_ = node_->create_wall_timer(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(period),
+                [this]() { publishAMPData(); });
+            
+            RCLCPP_INFO(node_->get_logger(), "AMP Data Publisher enabled at %.1f Hz", publish_rate);
+        }
+        else if (!enable && enable_amp_publisher_)
+        {
+            enable_amp_publisher_ = false;
+            amp_publish_timer_.reset();
+            amp_data_pub_.reset();
+            RCLCPP_INFO(node_->get_logger(), "AMP Data Publisher disabled");
+        }
+    }
+    
+    void CtrlComponent::publishAMPData()
+    {
+        if (!enable_amp_publisher_ || !mpc_running_)
+        {
+            return;
+        }
+
+        // Safety check: ensure ee_kinematics_ is initialized
+        if (!ee_kinematics_)
+        {
+            return;
+        }
+        
+        // Ensure Pinocchio interface is set (required before using getPosition/getVelocity)
+        ee_kinematics_->setPinocchioInterface(legged_interface_->getPinocchioInterface());
+
+        try
+        {
+            auto msg = control_input_msgs::msg::AMPMotionData();
+        
+            // Get current time
+            msg.timestamp = node_->get_clock()->now();
+        
+            // Extract root position (base position from state)
+            // Centroidal state: [normalized_momentum(6), base_ori_euler(3), base_pos(3), joint_pos(12)]
+            // But we need RBD state for velocities: [base_ori(3), base_pos(3), joint_pos(12), base_ang_vel(3), base_lin_vel(3), joint_vel(12)]
+            const auto& info = legged_interface_->getCentroidalModelInfo();
+            const int generalizedCoordinatesNum = info.generalizedCoordinatesNum;  // 18 = 6 (base) + 12 (joints)
+            
+            // Extract from measured_rbd_state_ (RBD state with velocities)
+            msg.root_pos[0] = measured_rbd_state_(3);  // x
+            msg.root_pos[1] = measured_rbd_state_(4);  // y
+            msg.root_pos[2] = measured_rbd_state_(5);  // z
+        
+            // Extract root orientation (convert from Euler ZYX to quaternion)
+            const double roll = measured_rbd_state_(0);
+            const double pitch = measured_rbd_state_(1);
+            const double yaw = measured_rbd_state_(2);
+        
+            // Convert Euler ZYX to quaternion
+            const double cy = std::cos(yaw * 0.5);
+            const double sy = std::sin(yaw * 0.5);
+            const double cp = std::cos(pitch * 0.5);
+            const double sp = std::sin(pitch * 0.5);
+            const double cr = std::cos(roll * 0.5);
+            const double sr = std::sin(roll * 0.5);
+        
+            msg.root_quat[0] = sr * cp * cy - cr * sp * sy;  // x
+            msg.root_quat[1] = cr * sp * cy + sr * cp * sy;  // y
+            msg.root_quat[2] = cr * cp * sy - sr * sp * cy;  // z
+            msg.root_quat[3] = cr * cp * cy + sr * sp * sy;  // w
+        
+            // Extract joint positions (12 DOF)
+            for (int i = 0; i < 12; ++i)
+            {
+                msg.joint_pos[i] = measured_rbd_state_(6 + i);  // Joint positions start at index 6 in RBD state
+            }
+        
+            // Compute foot positions in base frame using forward kinematics
+            const std::vector<Eigen::Vector3d> ee_positions = ee_kinematics_->getPosition(observation_.state);
+            for (size_t leg = 0; leg < 4; ++leg)
+            {
+                msg.foot_pos_local[leg * 3 + 0] = ee_positions[leg](0);
+                msg.foot_pos_local[leg * 3 + 1] = ee_positions[leg](1);
+                msg.foot_pos_local[leg * 3 + 2] = ee_positions[leg](2);
+            }
+        
+            // Extract linear velocity (base frame) - from RBD state
+            msg.linear_vel[0] = measured_rbd_state_(generalizedCoordinatesNum + 3);   // vx
+            msg.linear_vel[1] = measured_rbd_state_(generalizedCoordinatesNum + 4);   // vy
+            msg.linear_vel[2] = measured_rbd_state_(generalizedCoordinatesNum + 5);   // vz
+        
+            // Extract angular velocity (base frame) - from RBD state
+            msg.angular_vel[0] = measured_rbd_state_(generalizedCoordinatesNum + 0);   // wx
+            msg.angular_vel[1] = measured_rbd_state_(generalizedCoordinatesNum + 1);   // wy
+            msg.angular_vel[2] = measured_rbd_state_(generalizedCoordinatesNum + 2);   // wz
+        
+            // Extract joint velocities (12 DOF) - from RBD state
+            for (int i = 0; i < 12; ++i)
+            {
+                msg.joint_vel[i] = measured_rbd_state_(generalizedCoordinatesNum + 6 + i);  // Joint velocities start after base velocities
+            }
+        
+            // Compute foot velocities in base frame using forward kinematics
+            const std::vector<Eigen::Vector3d> ee_velocities = ee_kinematics_->getVelocity(observation_.state, observation_.input);
+            for (size_t leg = 0; leg < 4; ++leg)
+            {
+                msg.foot_vel_local[leg * 3 + 0] = ee_velocities[leg](0);
+                msg.foot_vel_local[leg * 3 + 1] = ee_velocities[leg](1);
+                msg.foot_vel_local[leg * 3 + 2] = ee_velocities[leg](2);
+            }
+        
+            // Publish the message
+            amp_data_pub_->publish(msg);
+        }
+        catch (const std::exception& e)
+        {
+            RCLCPP_WARN(node_->get_logger(), "AMP data publishing failed: %s", e.what());
+            return;
+        }
+    }
 }
+

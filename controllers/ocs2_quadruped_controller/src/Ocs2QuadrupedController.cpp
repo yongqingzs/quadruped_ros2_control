@@ -132,6 +132,14 @@ namespace ocs2::legged_robot
 
         ctrl_comp_ = std::make_shared<CtrlComponent>(get_node(), ctrl_interfaces_);
         ctrl_comp_->setupStateEstimate(estimator_type_);
+        
+        // Optional: Enable AMP data publisher
+        bool enable_amp_publisher = auto_declare<bool>("enable_amp_publisher", false);
+        if (enable_amp_publisher)
+        {
+            double amp_publish_rate = auto_declare<double>("amp_publish_rate", 50.0);
+            ctrl_comp_->enableAMPDataPublisher(true, amp_publish_rate);
+        }
 
         state_list_.passive = std::make_shared<StatePassive>(ctrl_interfaces_);
         state_list_.fixedDown = std::make_shared<StateOCS2>(ctrl_interfaces_, ctrl_comp_);

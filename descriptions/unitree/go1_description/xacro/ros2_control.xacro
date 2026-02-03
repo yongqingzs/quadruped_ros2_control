@@ -4,9 +4,9 @@
 	<ros2_control name="UnitreeSystem" type="system">
 
 		<hardware>
-			<!-- <plugin>hardware_unitree_sdk2/HardwareUnitree</plugin> -->
+			<plugin>hardware_unitree_sdk2/HardwareUnitree</plugin>
 			<!-- <plugin>hardware_unitree_ros2/HardwareUnitreeRos2</plugin> -->
-			<plugin>hardware_free_dog_sdk/HardwareFreeDogSdk</plugin>
+			<!-- <plugin>hardware_free_dog_sdk/HardwareFreeDogSdk</plugin> -->
 		</hardware>
 
 		<joint name="FR_hip_joint">

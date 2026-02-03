@@ -98,7 +98,7 @@ void KeyboardInput::check_value(char key) {
     switch (key) {
         case 'w':
         case 'W':
-            inputs_.ly = min<float>(inputs_.ly + sensitivity_left_, 3.0);
+            inputs_.ly = min<float>(inputs_.ly + sensitivity_left_, 3.5);
             break;
         case 's':
         case 'S':

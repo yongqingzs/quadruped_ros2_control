@@ -94,7 +94,7 @@ class RadioLinkInput(Node):
         # ROS2 environment settings
         self.ROS_SETUP = '/opt/ros/jazzy/setup.bash'
         self.WORKSPACE_SETUP = '/home/cat/jazzy_ws/install/setup.bash'
-        self.RL_SAR_SETUP = '/home/cat/rl_sar/install/setup.bash'
+        self.RL_SAR_SETUP = '/home/cat/rl_sar_lite/install/setup.bash'
         self.LAUNCH_FILE = '/home/cat/jazzy_ws/src/quadruped_ros2_control/controllers/ocs2_quadruped_controller/launch/mujoco.launch.py'
         self.RL_SAR_COMMAND = 'ros2 run rl_sar rl_real_go1'
 
